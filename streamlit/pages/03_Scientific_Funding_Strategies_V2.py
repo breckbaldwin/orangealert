@@ -1,16 +1,290 @@
-from kiwisolver import BadRequiredStrength
 import streamlit as st
-st.set_page_config(layout="wide")
-from numpy.random import default_rng
-import random
+#st.set_page_config(layout="wide")
 import pandas as pd
-import plotnine as p9
-from mizani.formatters import percent_format
+import os
+import sys
 import copy
+sys.path.append("pages/")
+
+import util
+
+
+
 
 st.title("How Algorithims Influence Research Diversity")
+st.markdown("A simulation fueled exploration")
 st.markdown("""**Breck Baldwin**, breckbaldwin@gmail.com
 September, 2022""")
+
+
+exp = st.expander("Introduction", expanded=False)
+exp.markdown("""
+## Welcome to the simulation
+
+This is going to be a _little_ different from a standard blog post and an experiment in exposing you, gentle reader, (Y,GR) to a more dynamic way to explore ideas you may not be familliar with. 
+
+## Where is the juice? 
+
+To put it bluntly, this article talks about approaches to research grant funding which I assume you don't really have opinions about or particularly care about. The juice or what you get out of reading/interacting with this is:
+- Lots of important decisions get made with the same algorithms I will be covering. Admissions, job applications and who gets picked for each side in a school yard kickball game.
+- Y,GR will learn properties of the algorithms by running simulations with brutally short explanations. Experiential learners rejoyce! I'm your boy.
+- No rule of three third point--got simulations to cover....
+
+## Scoring candidates
+
+Selection of 'winners' of limited resources often score candidates as a first step. This work focuses on what is done **after** the candidate scoring step has happened. But we still need a scoring step. The structure is as follows:
+
+- We have 10 projects, A-J
+- The projects have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scales. 
+- The projects can have the same skill or different skills, you get to play around with it.
+""")
+
+exp.markdown("""### Simulate score as a function of skill
+
+You'll be simulating wrecked lives as well as meteoric ascensions to greatness in no time, be patient. Who lets Y,GR play god? We do.
+
+Steps are:
+
+1. Assign skill values to the projects. The default is everyone is a '1.0'. If you choose to remain a communist you can leave them, otherwise you can mix them up a bit. 
+2. There is a 'Bell Curve' button to recreate Y,GR's harsher grading environments. 
+3. The skill is unavailable to mere human evaluators, but Y,GR are functioning as god here-- so you get access to the source code.
+""")
+
+num_projects = 10
+skills = [0.0, 1.0, 2.0, 3.0, 4.0]
+skills.reverse()
+names = "abcdefghijklmnopqrstuvwxyz".upper()
+names
+st.write("Initial Skills Assignment")
+proj_skill_values = [1.0] * num_projects
+
+if st.checkbox("Show how an American does it! (Bell curve)", value=False):
+    proj_skill_values = [1.0, 1.0, 1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 2.0, 1.0]
+cols = st.columns(num_projects)
+for i in range(num_projects):
+    proj_skill_values[i] = \
+        cols[i].radio(f"Proj {names[i]}", 
+                        skills, 
+                        index=skills.index(proj_skill_values[i]),
+                        key=i, 
+                        horizontal=False)
+y_offset = .03
+(proj_data) = util.init(proj_skill_values, names)
+
+#top_n_df = pd.DataFrame(top_n)
+
+exp = st.expander("Stupid Human Simulation: Drawing a score from the bell curve", expanded=False)
+exp.markdown("""
+Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
+
+As alluded to above, only god, knows the true skill behind a project. This could be people, resources, research area etc... But mere humans will be attempting to assign a score to each project's funding application. 
+
+Starting to drift off? Swap out 'score' with 'college application', 'Mr. America profile', 'audition' or any of how much one's 'jib' the-cut-of is apprecatiated by another human. 
+
+## Smart humans who figured out they are stupid
+
+This score business is gonna be noisy. For example the smartest people at the world's smartest artificial intelligence conference (Neurips) can't agree on the quality of submitted research papers. Respect to the smart people who worked hard to figure out they were stupid--twice. To be fair the entire task is roughly impossible, but there are places of agreement--more on that later. 
+
+Above you had the option to use the bell-curve to assign skill as god which in this simulation is the truth and a statement about how true skill varies among applicants. But now we are asking a mere human to **play** god by assigning a score to a research proposal that will be used to make a decision. If we had 100 reviewers we could assume the god assigned skill to be recovered most often of any score. The next most common scores would be plus/minus one grade (1.0), even less common would be those scores plus/minus 2.0 and so on. 
+
+But just like whether Y,GR chose a bell curve for true skill, the bell curve, aka Normal or Gaussian distribution, is an assumption. But as an assumption it covers a broad range of sins and problems that I'll decriment my bullet-point budget to articulate:
+
+- The key idea behind the bell curve as an error model for measurement is that errors tend to cancel each other out but only on average. So Dr. Faultenroy's utter ignorance of Bayesian statistics is canceled out by the fact that the title had a good pun. 
+- Because averages don't always end up at 50\% for two choices you get skewed heads/tails lots of times.
+- But most of the time you get 50/50, next most 49/51, 51/49, next most 48/52 and so on.
+- In violation of the 3 bullet point rule: There are other error models, bell curve is just very common and robust. 
+
+<img bell curve for coins>
+
+That's enough for now, go take a statistics course if you want to know more and for the love of god make sure it is a Bayesian one.
+
+So how do we manage our stupid human reviewer simulation? We assume they are going to be wrong a bunch but on average they will hit their numbers or be pretty close. We "virtually" throw a dart at the dark area of the above bell curve and if we hit the dark area we return the number on the x axis. If you think about it if we throw a million darts, the most common value will be the god decided skill. Pretty neat. But remember Y,GR, if you chose a bell curve for skills it has nothing to do with the measurements above, you could have been a unitarian. 
+
+The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
+""")
+
+standard_deviation = .2
+standard_deviation =\
+    st.slider("How much do scores (evaluation) vary in +/- grade points",   
+              min_value=0.0, max_value=1.0, step=0.1, value=standard_deviation)
+
+util.add_score([proj_data], standard_deviation, 0)
+
+exp = st.expander("Show drawn Scores", expanded=False)
+proj_df = pd.DataFrame(proj_data)
+exp.dataframe(proj_df.loc[:, proj_df.columns.isin(['id', 'skill', 'draw',
+                                                 'score', 'round'])])
+exp.markdown("""
+Each round of funding will draw a score and add it to the skill + reputation scores for the project. The reputation is 0 now, but with successful funding it will grow which reflects the benefit of a project being funded for subsequent rounds of funding. Reputation is how the rich get richer in this simulation which may or may not be a good idea--and it is central to the algorithms that we are experimenting with below.
+""")
+
+exp = st.expander("The Top N Algorithm")
+exp.markdown("""
+## Algorithmic Meritocracy: Top N
+
+The Top N algorithm will take the available budget, constrained to \$1 million awards, and parcel out budget starting at the top scoring project. If we have \$3 million in the budget, then the top 3 scoring projects get funding. If there are ties for the score then pick from the order that happens to be in the list. 
+
+Since the default order in this implementation will always choose alphabetically 'Proj A' before 'Proj B' if they have the same score we see programmer lazyness introducing bias.
+
+Repeating the algorithm:
+
+1. Select Top N proposals by score where N = millions of dollars of budget.
+2. For each awarded proposal, increment the total funding by $1 million 
+3. For each awarded proposal Increment the reputation by .5 (half a grade point)
+
+## Lets spend some money!
+
+Below we have the controls for a Top N algorithm simulation. 
+
+
+""")
+
+#Column 1
+
+#NUM_PROJECTS = col1.slider("Number of projects?", min_value=2, max_value=20, step=2, value=10)
+budget = 3
+budget = st.slider("""Budget in millions per cycle--each
+award is $1 million?""", 
+min_value=1, max_value=10, step=1, value=budget)
+exp = st.expander("Show one round of funding")
+top_n_data = copy.deepcopy(proj_data)
+top_n_winners = util.select_top_n(top_n_data, budget)
+funding_amount_in_millions = 1.0
+reputation_increase_per_funding_round = 0.5
+
+util.distribute_awards(top_n_winners, funding_amount_in_millions,
+                         reputation_increase_per_funding_round)
+
+proj_df = pd.DataFrame(top_n_data)
+(col1, col2) = exp.columns(2)
+col1.write("All Projects")
+col1.dataframe(proj_df.loc[:, proj_df.columns.isin(['id', 'skill', 'draw',
+                                                 'score', 'total funds'])])
+top_n_winners_df = pd.DataFrame(top_n_winners)
+col2.write("Winning Projects")
+col2.dataframe(top_n_winners_df.loc[:, proj_df.columns.isin(['id', 'skill', 'draw',
+                                                 'score', 'total funds'])])
+
+exp = st.expander("Applying Top N algorithm for multiple rounds of funding")
+
+exp.markdown("""
+## Cumulative Effects of Many Rounds of Funding: Empire building
+
+The Top N algorithm really shows its properties with repeated application. The key insight is the role of accumulated reputation which will give an advantage to projects that previously recieved funding. The analog in other domains would be generational wealth, personal wealth, and legacy applicants to colleges. 
+
+The below slider controls the number of funding rounds which in turn creates a graph showing the accumulated funding for projects over time. 
+
+""")
+
+(col1, col2, col3) = st.columns(3)
+num_funding_rounds = 4
+num_funding_rounds =\
+     col1.slider("How many funding cycles?", min_value=1, 
+                max_value=10, step=1, value=num_funding_rounds)
+
+reputation_increase_per_funding_round = .5
+reputation_increase_per_funding_round =\
+     col2.slider("How much increase in reputation per funding award", 
+                min_value=0.0, 
+                max_value=2.0, 
+                step=.25,
+                value=reputation_increase_per_funding_round)
+
+minimum_threshold = 1.5
+minimum_threshold = col3.slider("Minimum threshold for funding",
+                                min_value=0.0,
+                                max_value=3.0,
+                                step=.5,
+                                value=minimum_threshold)
+
+(col1, col2, col3) = st.columns(3)
+show_top_n = col1.checkbox("Top N", value=True)
+show_rand_n = col2.checkbox("Random N", value=True)
+show_hybrid = col3.checkbox("Hybrid", value=False)
+
+proj_data_2 = util.init(proj_skill_values, names)
+
+top_n = copy.deepcopy(proj_data_2)
+for proj in top_n:
+    proj['algo'] = 'Top N'
+
+rand_n = copy.deepcopy(proj_data_2)
+for proj in rand_n:
+    proj['algo'] = 'Random N'
+
+hybrid = copy.deepcopy(proj_data_2)
+for proj in hybrid:
+    proj['algo'] = 'Hybrid'
+
+top_n = copy.deepcopy(proj_data_2)
+results = []
+results.extend(top_n)
+results.extend(rand_n)
+results.extend(hybrid)
+for round_num in range(1, num_funding_rounds + 1):
+    top_n = copy.deepcopy(top_n)
+    rand_n = copy.deepcopy(rand_n)
+    hybrid = copy.deepcopy(hybrid)
+    util.add_score([top_n, rand_n, hybrid], standard_deviation, round_num)
+
+    top_n_winners = util.select_top_n(top_n, budget)
+    util.distribute_awards(top_n_winners, funding_amount_in_millions,
+                           reputation_increase_per_funding_round)
+    results.extend(top_n)
+
+    random_winners = util.select_random_n(budget, rand_n, minimum_threshold)
+    util.distribute_awards(random_winners, funding_amount_in_millions,
+                            reputation_increase_per_funding_round)
+    results.extend(rand_n)
+
+df = pd.DataFrame(results)
+
+y_dimension = 'total funds'
+y_dimension = st.radio("Y dimension", options=['total funds', 'draw', 'reputation', 'score', 'skill'])
+
+import plotnine as p9
+
+def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
+    if not (show_top_n or show_random_n or show_hybrid):
+        st.write("select a dataset to view")
+        return
+    offset_scale =  (max(df[column_to_show]) - min(df[column_to_show])) / 100
+    offset_scale = max(offset_scale, .01)
+    df['y'] = df[column_to_show] + df['y_offset'] * offset_scale
+
+    plot = (p9.ggplot(mapping=p9.aes(x='round', y='y', group = 'id')))
+    if show_top_n:
+        plot = plot + p9.geom_line(data=df[df['algo'] == 'Top N'],
+                                    mapping=p9.aes(color='id'), size=.7)
+    if show_random_n:
+        plot = plot + p9.geom_line(data=df[df['algo'] == 'Random N'],   
+                                    mapping=p9.aes(color='id'), size=.7, 
+                                    linetype='dotted')
+    if show_hybrid:
+        plot = plot + p9.geom_line(data=df[df['algo'] == 'Hybrid'], 
+                                    mapping=p9.aes(color='id'), size=.7, 
+                                    linetype='dashdot')
+    if (column_to_show == 'skill' 
+        and max(df[column_to_show]) == min(df[column_to_show])):
+        single_y = max(df[column_to_show])
+        plot = plot + p9.scale_y_continuous(
+            label=f"Y projects jittered by {offset_scale:.2f}",
+            limits=[single_y - 0.5, single_y + .5])
+    
+    plot = plot + p9.labels.ylab(f"Y projects jittered by {offset_scale:.2f}")
+    #plot = plot + p9.theme_xkcd()
+    st.pyplot(p9.ggplot.draw(plot))
+
+
+render3(df, y_dimension, show_top_n, show_rand_n, show_hybrid)
+
+
+f = """
+ which then have a selection algorithm: Top N Pick the highest score and then allocate the resource. If there are resources left then pick the next highest scoring winner and so on. 
+
+- Score candidates by merit
+
+"""
 
 exp = st.expander("Description")
 exp.markdown("""
@@ -28,134 +302,15 @@ Based on paper at: https://breckbaldwin.github.io/S3rd/presentations/DOE2021/Fun
     + The default threshold for funding is .2, so candidates have to get a bit lucky to draw a high value for the score initially to clear the threshold and then get lucky by being drawn from the set of candidates above threshold.
 - If a candidate is funded then their reputation increases .1 and the resource count increases by 1. Resources/reputation can only go up, merit stays the same. """)
 
-RNG = default_rng()
-NAMES = "abcdefghijklmnopqrstuvwxyz".upper()
 
 
-
-
-def init(proj_start_values):
-    top_n = [None] * len(proj_start_values)
-    random_n = [None] * len(proj_start_values)
-    hybrid = [None] * len(proj_start_values)
-    proj_jitter = 0.035
-    algo_jitter = 0.05
-    for i in range(len(proj_start_values)):
-        top_n[i] = {'id': f"Proj {NAMES[i]}", 
-                    'algo': 'Top N',
-                    'reputation': 0.0, 
-                    'skill': proj_start_values[i], 
-                    'total funds': -.5 + i * proj_jitter,
-                    'cumulative benefit': 0}
-        random_n[i] = {'id': f"Proj {NAMES[i]}", 
-                        'algo': 'Random N',
-                        'reputation': 0.0, 
-                        'skill': proj_start_values[i], 
-                        'total funds': algo_jitter + i * proj_jitter,
-                        'cumulative benefit': 0}
-        hybrid[i] = {'id': f"Proj {NAMES[i]}", 
-                        'algo': 'Hybrid',
-                        'reputation': 0.0, 
-                        'skill': proj_start_values[i], 
-                        'total funds': - (algo_jitter + i * proj_jitter),
-                        'cumulative benefit': 0}
-    return (top_n, random_n, hybrid)
-
-def compute_benefit(winner):
-    if winner['cumulative benefit'] == 0:
-        winner['cumulative benefit'] = 1
-    else:
-        winner['cumulative benefit'] += winner['cumulative benefit'] * .75
-
-def select_random_n(num_funding_slots, rand_n, funding_threshold):
-    random_candidates = []
-    threshold_drop = 0.0
-    while len(random_candidates) < num_funding_slots:
-        random_candidates = [s for s in rand_n if s['score'] > 
-                                funding_threshold - threshold_drop]
-        if len(random_candidates) < num_funding_slots:
-            threshold_drop += .5
-    if threshold_drop > 0:
-        st.info(f"Standards have been lowered! Threshold lowered by {threshold_drop:.2f} for iteration")
-    return random.sample(random_candidates, num_funding_slots)
-
-def run3(top_n, rand_n, hybrid, num_funding_rounds, num_projects, budget,
-            reputation_increase_from_funding, funding_threshold):
-    rounds_funding = []
-    for funding_round in range(num_funding_rounds + 1):
-        for proj_round in top_n + rand_n + hybrid:
-            result = copy.deepcopy(proj_round)
-            result['round'] = funding_round
-            rounds_funding.append(result)
-        if funding_round > num_funding_rounds:
-            break
-        for i in range(0, num_projects):
-            proposal_quality = RNG.normal(0, 1.0) #draw from bell curve
-            top_n[i]['score'] = (proposal_quality + 
-                                top_n[i]['skill'] + 
-                                top_n[i]['reputation'])
-            rand_n[i]['score'] = (proposal_quality +
-                                  rand_n[i]['skill'] +
-                                  rand_n[i]['reputation'])
-            hybrid[i]['score'] = (proposal_quality +
-                                hybrid[i]['skill'] +
-                                hybrid[i]['reputation'])    
-    #top_n
-        sorted_candidates = sorted(top_n, 
-                                key=lambda s:['score'], 
-                                reverse=True)    
-        for winner in sorted_candidates[0:budget]:
-            winner['reputation'] +=  reputation_increase_from_funding
-            winner['total funds'] += 1
-            #winner['cumulative benefit'] = compute_benefit(winner)
-    #random_n
-        winners = select_random_n(budget, rand_n, funding_threshold)
-        for winner in winners:
-            winner['reputation'] += reputation_increase_from_funding
-            winner['total funds'] += 1
-    #hybrid
-        sorted_candidates = sorted(hybrid, 
-                                key=lambda s:['score'], 
-                                reverse=True)
-        top_n_slots = budget // 2
-        top_n_winners = sorted_candidates[0:top_n_slots]
-        random_candidates = [candidate for candidate in hybrid if 
-                                candidate not in top_n_winners]
-        random_n_winners = select_random_n(budget - top_n_slots,
-                                            random_candidates,
-                                            funding_threshold)
-        for winner in top_n_winners + random_n_winners:
-            winner['reputation'] += reputation_increase_from_funding
-            winner['total funds'] += 1
-    return rounds_funding
-
-def render3(df, show_top_n, show_random_n, show_hybrid):
-    if not (show_top_n or show_random_n or show_hybrid):
-        st.write("select a dataset to view")
-        return
-    plot = (p9.ggplot(mapping=p9.aes(x='round', y='total funds', group = 'id')))
-    if show_top_n:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Top N'], 
-                                    mapping=p9.aes(color='id'), size=.7) 
-    if show_random_n:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Random N'],   
-                                    mapping=p9.aes(color='id'), size=.7, 
-                                    linetype='dotted')
-    if show_hybrid:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Hybrid'], 
-                                    mapping=p9.aes(color='id'), size=.7, 
-                                    linetype='dashdot')
-    #plot = plot + p9.theme_xkcd()
-    st.pyplot(p9.ggplot.draw(plot))
-
-
-def run():
+def page():
     (col1, col2) = st.columns(2)
     #Column 1
     num_projects = 10
     #NUM_PROJECTS = col1.slider("Number of projects?", min_value=2, max_value=20, step=2, value=10)
     num_funding_rounds = 4
-    num_funding_rounds = col1.slider("How many funding cycles?", min_value=1, max_value=10, step=1, value=num_funding_rounds)
+    num_funding_rounds = col1.slider("how many funding cycles?", min_value=1, max_value=10, step=1, value=num_funding_rounds)
     budget = 3
     BadRequiredStrength = col1.slider("""Budget in millions per cycle--each
 award is $1 million?""", 
@@ -192,19 +347,19 @@ award is $1 million?""",
     skills_display = ['0.0 F', '1.0 D', '2.0 C', '3.0 D', '4.0 A']
     skills = [0.0, 1.0, 2.0, 3.0, 4.0]
     skills.reverse()
-
+    names = "abcdefghijklmnopqrstuvwxyz".upper()
     st.write("Initial Skills Assignment")
     proj_skill_values = [1.0] * num_projects
     cols = st.columns(num_projects)
     with st.form("Custom Initial Skills"):
         for i in range(num_projects):
             proj_skill_values[i] = \
-                cols[i].radio(f"Proj {NAMES[i]}", 
+                cols[i].radio(f"Proj {names[i]}", 
                                 skills, 
                                 index=skills.index(proj_skill_values[i]),
                                 key=i, 
                                 horizontal=False)
-    (top_n, random_n, hybrid) = init(proj_skill_values)
+    (top_n, random_n, hybrid) = util.init(proj_skill_values, names)
 
     top_n_df = pd.DataFrame(top_n)
     rand_n_df = pd.DataFrame(random_n)
@@ -219,7 +374,8 @@ award is $1 million?""",
     col3.write("Hybrid initial values")
     col3.dataframe(hybrid)
 
-    data_df = pd.DataFrame(run3(top_n, random_n, hybrid, num_funding_rounds,
+    data_df = pd.DataFrame(util.run3(top_n, random_n, hybrid, 
+                                num_funding_rounds,
                                 num_projects, budget,
                                 reputation_increase_from_funding,
                                 funding_threshold))
@@ -228,10 +384,10 @@ award is $1 million?""",
     show_hybrid = st.checkbox("Show Hybrid", value=False, key="hybr")
     show_top_n = st.checkbox("Show Top N", value=True, key="top_n")
 
-    render3(data_df, show_top_n, show_random_n, show_hybrid)
+    util.render3(data_df, show_top_n, show_random_n, show_hybrid)
 
 
-run()
+page()
 
 # def run(projects_top_n, projects_random_n):
 #     threshold = 0.2
