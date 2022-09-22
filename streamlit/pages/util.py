@@ -35,7 +35,7 @@ def select_random_n(num_funding_slots, rand_n, funding_threshold):
     random_candidates = []
     threshold_drop = 0.0
     while len(random_candidates) < num_funding_slots:
-        random_candidates = [s for s in rand_n if s['score'] > 
+        random_candidates = [s for s in rand_n if s['score'] >=  
                                 funding_threshold - threshold_drop]
         if len(random_candidates) < num_funding_slots:
             threshold_drop += .5
