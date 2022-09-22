@@ -1,30 +1,45 @@
 from collections import defaultdict
+from turtle import onclick
 import streamlit as st
 #st.set_page_config(layout="wide")
 import pandas as pd
 import os
 import sys
 import copy
+import plotnine as p9
+import re
+
+
 sys.path.append("pages/")
 
 import util
 
 SS = st.session_state
-if 'draw_done' not in SS:
-    SS.draw_done = False
+if 'df' not in SS:
+    SS.df = None
+    SS.accum_df = None
+    SS.standard_deviation = .25
+    SS.budget = 2
+    SS.hybrid_top_n_budget = SS.budget//2
+    SS.funding_amount_in_millions = 1.0
+    SS.num_funding_rounds = 4
+    SS.reputation_increase_per_funding_round = .5
+    SS.minimum_threshold = 1.0
+    SS.num_sims = 1
+    SS.algo_names = ['Top N', 'Random N', 'Hybrid']
+    SS.num_projects = 10
+    SS.skills = [0.0, 1.0, 2.0, 3.0, 4.0]
+    SS.skills.reverse()
+    SS.names = "abcdefghijklmnopqrstuvwxyz".upper()
+    SS.proj_skill_values = [1.0] * SS.num_projects
 
-# default configuration
-standard_deviation = .2
-budget = 2
-hybrid_top_n_budget = budget//2
-funding_amount_in_millions = 1.0
-reputation_increase_per_funding_round = 0.5
-num_funding_rounds = 4
-reputation_increase_per_funding_round = .5
-minimum_threshold = 1.5
-
-def run_simulation(proj_data_2, num_funding_rounds, standard_deviation,
-                    reputation_increase_per_funding_round, budget, minimum_threshold):
+def run_simulation(proj_data_2, 
+                    num_funding_rounds, 
+                    standard_deviation,
+                    reputation_increase_per_funding_round, 
+                    budget,
+                    hybrid_top_n_budget, 
+                    minimum_threshold):
     top_n = copy.deepcopy(proj_data_2)
     for proj in top_n:
         proj['algo'] = 'Top N'
@@ -49,7 +64,8 @@ def run_simulation(proj_data_2, num_funding_rounds, standard_deviation,
                             reputation_increase_per_funding_round)
         results.extend(top_n)
 
-        random_n_winners = util.select_random_n(budget, rand_n, minimum_threshold)
+        random_n_winners = util.select_random_n(budget, rand_n, 
+                                                minimum_threshold)
         util.distribute_awards(random_n_winners, 1,
                                 reputation_increase_per_funding_round)
         results.extend(rand_n)
@@ -67,14 +83,96 @@ def run_simulation(proj_data_2, num_funding_rounds, standard_deviation,
         results.extend(hybrid)
     return pd.DataFrame(results)
 
+def run_n_simulations(num_sims, proj_skill_values, names, num_funding_rounds,
+                      standard_deviation, reputation_increase_per_funding_round, 
+                      budget, minimum_threshold, 
+                      hybrid_top_n_budget, algo_names, num_projects):
+    proj_data = util.init(proj_skill_values, names)
+    SS.df = None
+    bins = list(range(0, num_funding_rounds + 1))
+    SS.accum_df = pd.DataFrame({
+        'algo': sorted(algo_names * len(bins), reverse=True), 
+        'funding bin':  bins * len(algo_names), 
+        'count': [0] * len(bins) * len(algo_names),
+        '>= count': [0] * len(bins) * len(algo_names)})
+    for i in range(num_sims):
+        SS.df = run_simulation(proj_data, 
+                                num_funding_rounds, 
+                                standard_deviation,
+                                reputation_increase_per_funding_round, 
+                                budget,
+                                hybrid_top_n_budget,
+                                minimum_threshold)
+        accum_final_counts(SS.accum_df, SS.df, algo_names, num_funding_rounds)
+#    accum_gt_counts(num_funding_rounds, algo_names, SS.accum_df)
+    SS.accum_df['percent'] = SS.accum_df['count']/( num_projects * num_sims)
+    #SS.accum_df['>= percent'] = SS.accum_df['>= count']/total_funds
+    #st.dataframe(SS.accum_df)
+    SS.draw_done = True
+
+def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
+    if not (show_top_n or show_random_n or show_hybrid):
+        st.info("select a dataset to view")
+        return None
+    offset_scale =  (max(df[column_to_show]) - min(df[column_to_show])) / 100
+    offset_scale = max(offset_scale, .01)
+    df['y'] = df[column_to_show] + df['y_offset'] * offset_scale
+
+    plot = (p9.ggplot(mapping=p9.aes(x='round', y='y', group = 'id')))
+    if show_top_n:
+        plot = plot + p9.geom_line(data=df[df['algo'] == 'Top N'],
+                                    mapping=p9.aes(color='id'), size=.7)
+    if show_random_n:
+        plot = plot + p9.geom_line(data=df[df['algo'] == 'Random N'],   
+                                    mapping=p9.aes(color='id'), size=.7, 
+                                    linetype='dotted')
+    if show_hybrid:
+        plot = plot + p9.geom_line(data=df[df['algo'] == 'Hybrid'], 
+                                    mapping=p9.aes(color='id'), size=.7, 
+                                    linetype='dashdot')
+    if (column_to_show == 'skill' 
+        and max(df[column_to_show]) == min(df[column_to_show])):
+        single_y = max(df[column_to_show])
+        plot = plot + p9.scale_y_continuous(
+            label=f"Y projects jittered by {offset_scale:.2f}",
+            limits=[single_y - 0.5, single_y + .5])
+    
+    plot = plot + p9.labels.ylab(f"Y projects jittered by {offset_scale:.2f}")
+    #plot = plot + p9.theme_xkcd()
+    return plot
+
+def accum_final_counts(sim_df, df, algo_names, num_funding_rounds):
+    for algo in algo_names:
+        last_round_algo_df = df[(df['algo'] == algo) & 
+                            (df['round'] == num_funding_rounds)]
+        for total_funds in last_round_algo_df['total funds']:
+            total_funds_int = int(total_funds)
+            sim_df.loc[(sim_df['algo'] == algo) & 
+                        (sim_df['funding bin'] == total_funds_int), 
+                        'count'] += 1
+
+def accum_gt_counts(num_funding_rounds, algo_names, sim_df):
+    for algo in algo_names:
+        for value in range(1, num_funding_rounds + 1):
+                gt_count = \
+                    sum(sim_df[(sim_df['algo'] == algo) &
+                            (sim_df['funding bin'] >= value)]['count'])
+                sim_df.loc[(sim_df['algo'] == algo) &
+                            (sim_df['funding bin'] == value), 
+                            '>= count'] = gt_count
+
+show_explanation = True
 st.title("How Algorithims Influence Research Diversity")
-st.markdown("A simulation fueled exploration")
-st.markdown("""**Breck Baldwin**, breckbaldwin@gmail.com
-September, 2022""")
+if show_explanation:
+    st.markdown("A simulation fueled exploration")
+    st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
+                 "\nSeptember, 2022"))
 
+show_explanation = st.checkbox("Show Explanation", value=show_explanation)
 
-exp = st.expander("Introduction", expanded=False)
-exp.markdown("""
+if show_explanation:
+    exp = st.expander("Introduction", expanded=False)
+    exp.markdown("""
 ## Welcome to the simulation
 
 This is going to be a _little_ different from a standard blog post and an experiment in exposing you, gentle reader, (Y,GR) to a more dynamic way to explore ideas you may not be familliar with. 
@@ -95,7 +193,7 @@ Selection of 'winners' of limited resources often score candidates as a first st
 - The projects can have the same skill or different skills, you get to play around with it.
 """)
 
-exp.markdown("""### Simulate score as a function of skill
+    exp.markdown("""### Simulate score as a function of skill
 
 You'll be simulating wrecked lives as well as meteoric ascensions to greatness in no time, be patient. Who lets Y,GR play god? We do.
 
@@ -106,29 +204,25 @@ Steps are:
 3. The skill is unavailable to mere human evaluators, but Y,GR are functioning as god here-- so you get access to the source code.
 """)
 
-num_projects = 10
-skills = [0.0, 1.0, 2.0, 3.0, 4.0]
-skills.reverse()
-names = "abcdefghijklmnopqrstuvwxyz".upper()
-st.write("Initial Skills Assignment")
-proj_skill_values = [1.0] * num_projects
+if show_explanation:
+    st.write("Initial Skills Assignment")
 
-if st.checkbox("Show how an American does it! (Bell curve)", value=False):
-    proj_skill_values = [1.0, 1.0, 1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 2.0, 1.0]
-cols = st.columns(num_projects)
-for i in range(num_projects):
-    proj_skill_values[i] = \
-        cols[i].radio(f"Proj {names[i]}", 
-                        skills, 
-                        index=skills.index(proj_skill_values[i]),
+exp = st.expander("Set project abilities")
+if exp.checkbox("Apply Bell curve grading", value=False):
+    SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
+cols = exp.columns(SS.num_projects)
+for i in range(SS.num_projects):
+    SS.proj_skill_values[i] = \
+        cols[i].radio(f"Proj {SS.names[i]}", 
+                        SS.skills, 
+                        index=SS.skills.index(SS.proj_skill_values[i]),
                         key=i, 
                         horizontal=False)
-proj_data = util.init(proj_skill_values, names)
 
 #top_n_df = pd.DataFrame(top_n)
-
-exp = st.expander("Stupid Human Simulation: Drawing a score from the bell curve", expanded=False)
-exp.markdown("""
+if show_explanation:
+    exp = st.expander("Stupid Human Simulation: Drawing a score from the bell curve", expanded=False)
+    exp.markdown("""
 Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
 
 As alluded to above, only god, knows the true skill behind a project. This could be people, resources, research area etc... But mere humans will be attempting to assign a score to each project's funding application. 
@@ -157,31 +251,58 @@ So how do we manage our stupid human reviewer simulation? We assume they are goi
 The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
 """)
 
-
 standard_deviation =\
-    st.slider("How much do scores (evaluation) vary in +/- grade points",   
-              min_value=0.0, max_value=1.0, step=0.1, value=standard_deviation)
+    st.slider("67% of scores fall within specified +/- range in grade points",   
+              min_value=0.0, max_value=1.0, step=0.25, value=SS.standard_deviation)
+
+if 'df' not in SS:
+    SS.df = None
+    SS.accum_df = None
 
 
-df = None
-if st.button("Draw/reset scores"):
-    df = run_simulation(proj_data, num_funding_rounds, standard_deviation,
-                    reputation_increase_per_funding_round, budget, minimum_threshold)
-    SS.draw_done = True
 
-if not SS.draw_done:
-    st.info("Push 'Draw score' to evaluate/draw evaluations")
-    st.stop()
- 
-exp = st.expander("Show drawn Scores", expanded=False)
-res_df = df[(df['algo'] == 'Top N') & (df['round'] == 1)]
-exp.dataframe(res_df.loc[:, res_df.columns.isin(['id', 'draw'])])
-exp.markdown("""
+one_run_button_description = "Run simulation once"
+if show_explanation:
+    if st.button(one_run_button_description):
+        run_n_simulations(SS.num_sims, 
+                          SS.proj_skill_values, 
+                          SS.names,
+                          SS.num_funding_rounds,
+                          SS.standard_deviation, 
+                          SS.reputation_increase_per_funding_round, 
+                          SS.budget, 
+                          SS.minimum_threshold,
+                          SS.hybrid_top_n_budget,
+                          SS.algo_names, 
+                          SS.num_projects)
+
+if SS.df is None:
+    if show_explanation:
+        st.info(f"Push {one_run_button_description} to evaluate/draw evaluations")
+        st.stop()
+    else:
+        run_n_simulations(1, 
+                          SS.proj_skill_values, 
+                          SS.names,
+                          SS.num_funding_rounds,
+                          SS.standard_deviation, 
+                          SS.reputation_increase_per_funding_round, 
+                          SS.budget, 
+                          SS.minimum_threshold,
+                          SS.hybrid_top_n_budget,
+                          SS.algo_names, 
+                          SS.num_projects)
+        
+if show_explanation:
+    exp = st.expander("Show drawn Scores", expanded=False)
+    res_df = SS.df[(SS.df['algo'] == 'Top N') & (SS.df['round'] == 1)]
+    exp.dataframe(res_df.loc[:, res_df.columns.isin(['id', 'draw'])])
+    exp.markdown("""
 Each round of funding will draw a score and add it to the skill + reputation scores for the project. The reputation is 0 now, but with successful funding it will grow which reflects the benefit of a project being funded for subsequent rounds of funding. Reputation is how the rich get richer in this simulation which may or may not be a good idea--and it is central to the algorithms that we are experimenting with below.
 """)
 
-exp = st.expander("The Top N Algorithm")
-exp.markdown("""
+    exp = st.expander("The Top N Algorithm")
+    exp.markdown("""
 ## Algorithmic Meritocracy: Top N
 
 The Top N algorithm will take the available budget, constrained to \$1 million awards, and parcel out budget starting at the top scoring project. If we have \$3 million in the budget, then the top 3 scoring projects get funding. If there are ties for the score then pick from the order that happens to be in the list. 
@@ -201,25 +322,29 @@ Below we have the controls for a Top N algorithm simulation.
 
 """)
 
-#Column 1
+def generic_handler(widget_name, variable):
+    SS[variable] = SS[widget_name]
 
-#NUM_PROJECTS = col1.slider("Number of projects?", min_value=2, max_value=20, step=2, value=10)
-budget = st.slider("""Budget in millions per cycle--each
-award is $1 million?""", 
-min_value=2, max_value=10, step=2, value=budget)
+st.slider(("Budget in millions per cycle--each" + 
+            "award is $1 million?"), 
+            min_value=2, max_value=10, step=2, value=SS.budget, 
+            on_change=generic_handler,
+            args=('budget slider', 'budget'),
+            key='budget slider')
 
-hybrid_random_n_budget = budget - hybrid_top_n_budget
-st.write(f"Hybrid Top N={hybrid_top_n_budget} Random N={hybrid_random_n_budget}")
+hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
+st.write(f"Hybrid Top N={SS.hybrid_top_n_budget} Random N={hybrid_random_n_budget}")
 
 
-exp = st.expander("Show one round of funding")
-(col1, col2) = exp.columns(2)
-col1.write("All Projects")
-top_n_df = res_df.loc[:, df.columns.isin(['id', 'skill', 'draw',
+if show_explanation:
+    exp = st.expander("Show one round of funding")
+    (col1, col2) = exp.columns(2)
+    col1.write("All Projects")
+    top_n_df = res_df.loc[:, SS.df.columns.isin(['id', 'skill', 'draw',
                                              'score', 'total funds'])]
-col1.dataframe(top_n_df)
-col2.write("Winning Projects")
-col2.dataframe(top_n_df[top_n_df['total funds'] == 1])
+    col1.dataframe(top_n_df)
+    col2.write("Winning Projects")
+    col2.dataframe(top_n_df[top_n_df['total funds'] == 1])
 
 #exp = st.expander("Applying Top N algorithm for multiple rounds of funding")
 
@@ -231,9 +356,10 @@ The Top N algorithm really shows its properties with repeated application. The k
 The below slider controls the number of funding rounds which in turn creates a graph showing the accumulated funding for projects over time. 
 """
 
-exp= st.expander("Random N algorithm description")
+if show_explanation:
+    exp= st.expander("Random N algorithm description")
 
-exp.markdown("""
+    exp.markdown("""
 ## Random funding above a threshold: Work hard **and** get lucky
 
 This here is **very** threatening to metocratic ideals by making clear that all that hard work may not pay off because of luck. Try it on for size: 
@@ -241,146 +367,122 @@ This here is **very** threatening to metocratic ideals by making clear that all 
 - Work hard, get a PhD, write a difficult proposal to qualifiy to be considered for funding with a score above a threshold. If more proposals are above threshold than the budget allows then select randomly. Brutal no? 
 """)
 
-exp = st.expander("Hybrid: The reality program managers would accept")
+    exp = st.expander("Hybrid: The reality program managers would accept")
 
-exp.markdown("""
+    exp.markdown("""
 Proposals tend to either be OMG this should be funded with a long tail of less extraordnary efforts. Program managers, admission committees and other selection processes do feel that judgement has an important and predictively useful role which is the driving force behind the Top N algorithm. So the hybrid algorithm acknoledges that but changes that to Top N/2 where half the funding is done that way, the remainder is Random N. The ratio could be adjusted but trying to keep it simple.
 """)
 
 (col1, col2, col3) = st.columns(3)
 
-num_funding_rounds =\
-     col1.slider("How many funding cycles?", min_value=1, 
-                max_value=10, step=1, value=num_funding_rounds)
+col1.slider("How many funding cycles?", min_value=1, 
+            max_value=10, step=1, value=SS.num_funding_rounds,
+            on_change=generic_handler,
+            args=('funding slider', 'num_funding_rounds'),
+            key='funding slider')
 
-reputation_increase_per_funding_round =\
-     col2.slider("How much increase in reputation per funding award", 
+col2.slider("How much increase in reputation per funding award", 
                 min_value=0.0, 
                 max_value=2.0, 
                 step=.25,
-                value=reputation_increase_per_funding_round)
+                value=SS.reputation_increase_per_funding_round,
+                on_change=generic_handler,
+                args=('reputation slider', 
+                      'reputation_increase_per_funding_round'),
+                key='reputation slider')
 
-minimum_threshold = col3.slider("Minimum threshold for funding",
-                                min_value=0.0,
-                                max_value=3.0,
-                                step=.5,
-                                value=minimum_threshold)
+col3.slider("Minimum threshold for funding",
+            min_value=0.0,
+            max_value=3.0,
+            step=.25,
+            value=SS.minimum_threshold,
+            on_change=generic_handler,
+            args=('threshold slider', 'minimum_threshold'),
+            key='threshold slider')
 
-(col1, col2, col3) = st.columns(3)
+if show_explanation:
+    exp1 = col1.expander("Details")
+    exp1.markdown(top_n_doc)
+
+def apply_options():
+    params = SS.interesting_params.split(', ')
+    for param in params:
+        split = param.split(': ')
+        if len(split) == 2:
+            param = split[0]
+            if param not in SS:
+                st.info(f"No such parameter {param}")
+                continue;
+            value= split[1]
+            st.info(value)
+            if re.match(r'^\d+\.\d+$', value):
+                value = float(value)
+            elif re.match(r'^\d+$', value):
+                value = int(value)
+            SS[param] = value
+
+options = ['Custom', 
+        'reputation_increase_per_funding_round: 0.0, All algorithms perform same',
+        'reputation: 1.5, Reputation increase: .25, Funding Threshold: 1.0, Score variation:.25, Budget: 2 million']
+st.selectbox("Interesting Parameterizations", options=options,
+            on_change=apply_options,
+            key='interesting_params')
+
+exp = st.expander("Show Last Simulation Detail Graph")
+if SS.num_sims > 1:
+    exp.info("Only last simulation results graphed since the number of simulations is > 1")
+
+(col1, col2, col3) = exp.columns(3)
 show_top_n = col1.checkbox("Top N", value=True)
-exp1 = col1.expander("Details")
-exp1.markdown(top_n_doc)
 show_rand_n = col2.checkbox("Random N", value=True)
 show_hybrid = col3.checkbox("Hybrid", value=False)
 
 y_dimension = 'total funds'
-y_dimension = st.radio("Y dimension--draw and skill same across all algorithms", options=['total funds', 'draw', 'reputation', 'score', 'skill'])
-
-import plotnine as p9
-
-def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
-    if not (show_top_n or show_random_n or show_hybrid):
-        st.write("select a dataset to view")
-        return
-    offset_scale =  (max(df[column_to_show]) - min(df[column_to_show])) / 100
-    offset_scale = max(offset_scale, .01)
-    df['y'] = df[column_to_show] + df['y_offset'] * offset_scale
-
-    plot = (p9.ggplot(mapping=p9.aes(x='round', y='y', group = 'id')))
-    if show_top_n:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Top N'],
-                                    mapping=p9.aes(color='id'), size=.7)
-    if show_random_n:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Random N'],   
-                                    mapping=p9.aes(color='id'), size=.7, 
-                                    linetype='dotted')
-    if show_hybrid:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Hybrid'], 
-                                    mapping=p9.aes(color='id'), size=.7, 
-                                    linetype='dashdot')
-    if (column_to_show == 'skill' 
-        and max(df[column_to_show]) == min(df[column_to_show])):
-        single_y = max(df[column_to_show])
-        plot = plot + p9.scale_y_continuous(
-            label=f"Y projects jittered by {offset_scale:.2f}",
-            limits=[single_y - 0.5, single_y + .5])
-    
-    plot = plot + p9.labels.ylab(f"Y projects jittered by {offset_scale:.2f}")
-    #plot = plot + p9.theme_xkcd()
-    st.pyplot(p9.ggplot.draw(plot))
+y_dimension = exp.radio("Y dimension",
+                options=['total funds', 'draw', 'reputation', 'score', 'skill'],
+                horizontal=True)
+plot = render3(SS.df, y_dimension, show_top_n, show_rand_n, show_hybrid)
+if plot is not None:
+    exp.pyplot(p9.ggplot.draw(plot))
 
 
-render3(df, y_dimension, show_top_n, show_rand_n, show_hybrid)
-#st.write(f{df[df[y]]})
+y_units= 'count'
+y_units = st.radio("Y units", ['count', 'percent'], index=0)
 
-accumulated_total_funds_count = defaultdict(lambda: defaultdict(int))
+from mizani.formatters import percent_format
+#st.dataframe(SS.accum_df)
+plot = (p9.ggplot(SS.accum_df, p9.aes(x='funding bin', y=y_units, fill='algo')) 
+      + p9.geom_col(position='dodge')
+)
 
-#{'algo':[], 'total funds': [], 'count': []}
+if y_units == 'percent':
+    plot = plot + p9.scale_y_continuous(labels=percent_format())
 
-algo_names = ['Top N', 'Random N', 'Hybrid']
-
-st.write(f"Budget = {budget}")
-
-max_accum = num_funding_rounds
-bins = list(range(0, max_accum + 1))
-
-accum = {
-    'algo': sorted(algo_names * len(bins), reverse=True), 
-    'funding bin':  bins * len(algo_names), 
-    'count': [0] * len(bins) * len(algo_names),
-    '>= count': [0] * len(bins) * len(algo_names)}
-
-#st.json(accum)
-sim_df = pd.DataFrame(accum)
-
-#st.dataframe(sim_df)
-#{algo: {funds: count}}
-
-for algo in algo_names:
-    last_round_algo_df = df[(df['algo'] == algo) & 
-                            (df['round'] == num_funding_rounds)]
-    st.write((f"{algo}: {list(last_round_algo_df['total funds'])}" +
-              f" {sum(last_round_algo_df['total funds'])}"))
-
-
-for sim_run in range(1):
-    for algo in algo_names:
-        last_round_algo_df = df[(df['algo'] == algo) & 
-                                (df['round'] == num_funding_rounds)]
-        for total_funds in last_round_algo_df['total funds']:
-            total_funds_int = int(total_funds)
-            sim_df.loc[(sim_df['algo'] == algo) & 
-                        (sim_df['funding bin'] == total_funds_int), 
-                        'count'] += 1
-        for value in range(budget + 1):
-            gt_count = \
-                len(last_round_algo_df[last_round_algo_df['total funds'] >= value])
-            sim_df.loc[(sim_df['algo'] == algo) &
-                       (sim_df['funding bin'] == value),
-                        '>= count'] = gt_count
-                        
-
-value = st.slider("How projects >= to level?", min_value=0, max_value=budget, step=1)
-
-
-
-for algo in algo_names:
-    last_round_algo_df = df[(df['algo'] == algo) & 
-                            (df['round'] == num_funding_rounds)]
-    num_gte = len(last_round_algo_df[last_round_algo_df['total funds'] >= value])
-    st.write(f"{algo} has {num_gte} projects at or greater than {value}")
-    
-
-st.dataframe(pd.DataFrame(sim_df))
-
-plot = (p9.ggplot(sim_df, p9.aes(x='funding bin', y='count', fill='algo')) 
-      + p9.geom_col(position='dodge'))
 st.pyplot(p9.ggplot.draw(plot))
 
-plot = (p9.ggplot(sim_df, p9.aes(x='funding bin', y='>= count', fill='algo')) 
-    + p9.geom_col(position='dodge'))
-st.pyplot(p9.ggplot.draw(plot))
+exp = st.expander("Show Parameter Selections")
 
+
+def run_n_wrapper():
+    SS.num_sims = SS.simulation_radio_btn
+    run_n_simulations(SS.num_sims, 
+                    SS.proj_skill_values, 
+                    SS.names,
+                    SS.num_funding_rounds,
+                    SS.standard_deviation, 
+                    SS.reputation_increase_per_funding_round, 
+                    SS.budget, 
+                    SS.minimum_threshold,
+                    SS.hybrid_top_n_budget,
+                    SS.algo_names, 
+                    SS.num_projects)
+
+options = [1, 2, 10, 100]
+st.radio("Run N simulations", options=options, 
+          index=options.index(SS.num_sims), 
+          on_change=run_n_wrapper, 
+          key='simulation_radio_btn')
+st.button("Rerun as configured", on_click=run_n_wrapper)
 
 
 g = """
