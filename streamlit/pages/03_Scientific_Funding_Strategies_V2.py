@@ -8,6 +8,7 @@ import sys
 import copy
 import plotnine as p9
 import re
+from mizani.formatters import percent_format
 
 
 sys.path.append("pages/")
@@ -36,8 +37,8 @@ def reset():
     SS.show_explanation = False
     SS.Notes = 'reset()'
 
-session_config_values = ['standard_deviation', 'budget', 'funding_amount_in_millions', 'num_funding_rounds', 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
-'proj_skill_values', 'Notes']
+session_config_values = ['Notes', 'standard_deviation', 'budget', 'funding_amount_in_millions', 'num_funding_rounds', 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
+'proj_skill_values', 'accum_df']
 
 if 'df' not in SS:
     reset()
@@ -138,8 +139,8 @@ def run_n_simulations(num_sims, proj_skill_values, names,
                 config[f'{algo}: ${n}M'] = f'{count/total:.0%}'
         #config[f'{algo} count of projects awarded amount in millions'] = \
         #        '\n'.join(bins)
-        config[f'{algo} % of projects awarded amount in $ millions'] = \
-                ', '.join(bins_perc)
+        #config[f'{algo} % of projects awarded amount in $ millions'] = \
+        #        ', '.join(bins_perc)
     SS.sessions.append(config)
 
 def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
@@ -506,7 +507,7 @@ if plot is not None:
 y_units= 'count'
 y_units = st.radio("Y units", ['count', 'percent'], index=0)
 
-from mizani.formatters import percent_format
+
 #st.dataframe(SS.accum_df)
 plot = (p9.ggplot(SS.accum_df, p9.aes(x='funding bin', y=y_units, fill='algo')) 
       + p9.geom_col(position='dodge')
@@ -517,11 +518,9 @@ if y_units == 'percent':
 
 st.pyplot(p9.ggplot.draw(plot))
 
-exp = st.expander("Show Parameter Selections")
-
-
 def run_n_wrapper():
     SS.num_sims = SS.simulation_radio_btn
+    SS.Notes = ''
     run_n_simulations(SS.num_sims, 
                     SS.proj_skill_values, 
                     SS.names,
@@ -535,9 +534,22 @@ def run_n_wrapper():
                     SS.num_projects)
 
 
-st.text_input("Notes:", value=SS.Notes, on_change=generic_handler,
-                args=('notes_input', 'Notes'),
+def notes_handler():
+    SS.Notes = SS.notes_input
+    SS.sessions[-1]['Notes'] = SS.notes_input
+    
+
+
+st.text_input("Notes:", value=SS.Notes, 
+                on_change=notes_handler,
                 key='notes_input')
+
+def render_session():
+    SS.accum_df = SS.sessions[SS.graph_session_select]['accum_df']
+
+st.selectbox("Graph run", options=range(len(SS.sessions)),
+            on_change=render_session,
+            key='graph_session_select')
                 
 options = [1, 2, 10, 100]
 st.radio("Run N simulations", options=options, 
@@ -546,7 +558,16 @@ st.radio("Run N simulations", options=options,
           key='simulation_radio_btn')
 st.button("Rerun as configured", on_click=run_n_wrapper)
 
-st.dataframe(pd.DataFrame(SS.sessions))
+
+st.info(SS.Notes)
+sessions_df = pd.DataFrame(SS.sessions)
+cols = list(sessions_df.columns)
+cols.remove('accum_df')
+leftmost_cols = ['Notes', 'Top N: $0M', 'Random N: $0M', 'Hybrid: $0M']
+rightmost_cols = \
+    [col for col in cols if col not in leftmost_cols]
+reordered_cols = leftmost_cols + rightmost_cols
+st.dataframe(sessions_df[reordered_cols])
 
 
 g = """
