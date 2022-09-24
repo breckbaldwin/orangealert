@@ -15,7 +15,8 @@ sys.path.append("pages/")
 import util
 
 SS = st.session_state
-if 'df' not in SS:
+
+def reset():
     SS.df = None
     SS.accum_df = None
     SS.standard_deviation = .25
@@ -32,6 +33,15 @@ if 'df' not in SS:
     SS.skills.reverse()
     SS.names = "abcdefghijklmnopqrstuvwxyz".upper()
     SS.proj_skill_values = [1.0] * SS.num_projects
+    SS.show_explanation = False
+    SS.Notes = 'reset()'
+
+session_config_values = ['standard_deviation', 'budget', 'funding_amount_in_millions', 'num_funding_rounds', 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
+'proj_skill_values', 'Notes']
+
+if 'df' not in SS:
+    reset()
+    SS.sessions = []
 
 def run_simulation(proj_data_2, 
                     num_funding_rounds, 
@@ -83,7 +93,8 @@ def run_simulation(proj_data_2,
         results.extend(hybrid)
     return pd.DataFrame(results)
 
-def run_n_simulations(num_sims, proj_skill_values, names, num_funding_rounds,
+def run_n_simulations(num_sims, proj_skill_values, names, 
+                      num_funding_rounds,
                       standard_deviation, reputation_increase_per_funding_round, 
                       budget, minimum_threshold, 
                       hybrid_top_n_budget, algo_names, num_projects):
@@ -108,7 +119,28 @@ def run_n_simulations(num_sims, proj_skill_values, names, num_funding_rounds,
     SS.accum_df['percent'] = SS.accum_df['count']/( num_projects * num_sims)
     #SS.accum_df['>= percent'] = SS.accum_df['>= count']/total_funds
     #st.dataframe(SS.accum_df)
-    SS.draw_done = True
+    config = {k:SS[k] for k in session_config_values}
+    for algo in SS.algo_names:
+        bins = []
+        bins_perc = []
+        total = sum(SS.accum_df.loc[(SS.accum_df.algo == algo), 
+                                    'count'])
+        for n in range(SS.num_funding_rounds + 1):
+            #st.info(n)
+            count = SS.accum_df.loc[(SS.accum_df.algo == algo) &\
+                                    (SS.accum_df['funding bin'] == n), 
+                                    'count'].values[0]
+            amount = '$0' if n == 0 else f'${n} million'
+            bins.append(f'{amount}: {count}')
+            bins_perc.append(f'{count/total:.0%} @ {amount}')
+            #config[f"{algo}: ${n}M count"] = count
+            if n == 0:
+                config[f'{algo}: ${n}M'] = f'{count/total:.0%}'
+        #config[f'{algo} count of projects awarded amount in millions'] = \
+        #        '\n'.join(bins)
+        config[f'{algo} % of projects awarded amount in $ millions'] = \
+                ', '.join(bins_perc)
+    SS.sessions.append(config)
 
 def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
     if not (show_top_n or show_random_n or show_hybrid):
@@ -161,16 +193,16 @@ def accum_gt_counts(num_funding_rounds, algo_names, sim_df):
                             (sim_df['funding bin'] == value), 
                             '>= count'] = gt_count
 
-show_explanation = True
+
 st.title("How Algorithims Influence Research Diversity")
-if show_explanation:
+if SS.show_explanation:
     st.markdown("A simulation fueled exploration")
     st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
                  "\nSeptember, 2022"))
 
-show_explanation = st.checkbox("Show Explanation", value=show_explanation)
+SS.show_explanation = st.checkbox("Show Explanation", value=SS.show_explanation)
 
-if show_explanation:
+if SS.show_explanation:
     exp = st.expander("Introduction", expanded=False)
     exp.markdown("""
 ## Welcome to the simulation
@@ -204,7 +236,7 @@ Steps are:
 3. The skill is unavailable to mere human evaluators, but Y,GR are functioning as god here-- so you get access to the source code.
 """)
 
-if show_explanation:
+if SS.show_explanation:
     st.write("Initial Skills Assignment")
 
 exp = st.expander("Set project abilities")
@@ -220,7 +252,7 @@ for i in range(SS.num_projects):
                         horizontal=False)
 
 #top_n_df = pd.DataFrame(top_n)
-if show_explanation:
+if SS.show_explanation:
     exp = st.expander("Stupid Human Simulation: Drawing a score from the bell curve", expanded=False)
     exp.markdown("""
 Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
@@ -260,9 +292,23 @@ if 'df' not in SS:
     SS.accum_df = None
 
 
+def run_sim_as_configured():
+    run_n_simulations(SS.num_sims, 
+                    SS.proj_skill_values, 
+                    SS.names,
+                    SS.num_funding_rounds,
+                    SS.standard_deviation, 
+                    SS.reputation_increase_per_funding_round, 
+                    SS.budget, 
+                    SS.minimum_threshold,
+                    SS.hybrid_top_n_budget,
+                    SS.algo_names, 
+                    SS.num_projects)
+    
+
 
 one_run_button_description = "Run simulation once"
-if show_explanation:
+if SS.show_explanation:
     if st.button(one_run_button_description):
         run_n_simulations(SS.num_sims, 
                           SS.proj_skill_values, 
@@ -277,7 +323,7 @@ if show_explanation:
                           SS.num_projects)
 
 if SS.df is None:
-    if show_explanation:
+    if SS.show_explanation:
         st.info(f"Push {one_run_button_description} to evaluate/draw evaluations")
         st.stop()
     else:
@@ -293,7 +339,7 @@ if SS.df is None:
                           SS.algo_names, 
                           SS.num_projects)
         
-if show_explanation:
+if SS.show_explanation:
     exp = st.expander("Show drawn Scores", expanded=False)
     res_df = SS.df[(SS.df['algo'] == 'Top N') & (SS.df['round'] == 1)]
     exp.dataframe(res_df.loc[:, res_df.columns.isin(['id', 'draw'])])
@@ -336,7 +382,7 @@ hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
 st.write(f"Hybrid Top N={SS.hybrid_top_n_budget} Random N={hybrid_random_n_budget}")
 
 
-if show_explanation:
+if SS.show_explanation:
     exp = st.expander("Show one round of funding")
     (col1, col2) = exp.columns(2)
     col1.write("All Projects")
@@ -356,7 +402,7 @@ The Top N algorithm really shows its properties with repeated application. The k
 The below slider controls the number of funding rounds which in turn creates a graph showing the accumulated funding for projects over time. 
 """
 
-if show_explanation:
+if SS.show_explanation:
     exp= st.expander("Random N algorithm description")
 
     exp.markdown("""
@@ -400,14 +446,18 @@ col3.slider("Minimum threshold for funding",
             args=('threshold slider', 'minimum_threshold'),
             key='threshold slider')
 
-if show_explanation:
+if SS.show_explanation:
     exp1 = col1.expander("Details")
     exp1.markdown(top_n_doc)
 
 def apply_options():
     params = SS.interesting_params.split(', ')
-    for param in params:
-        split = param.split(': ')
+    notes = ''
+    for param_value in params:
+        if param_value == 'reset()':
+            reset()
+            continue
+        split = param_value.split(': ')
         if len(split) == 2:
             param = split[0]
             if param not in SS:
@@ -419,11 +469,18 @@ def apply_options():
                 value = float(value)
             elif re.match(r'^\d+$', value):
                 value = int(value)
+            if param == 'Notes':
+                notes = value
             SS[param] = value
+    SS.Notes = notes
+    run_sim_as_configured()
 
 options = ['Custom', 
-        'reputation_increase_per_funding_round: 0.0, All algorithms perform same',
-        'reputation: 1.5, Reputation increase: .25, Funding Threshold: 1.0, Score variation:.25, Budget: 2 million']
+'Notes: 1) Reset to defaults, reset()',
+'Notes: 2) No reputation increase--algos roughly same, reset(), reputation_increase_per_funding_round: 0.0, num_sims: 100',
+'Notes: 3) Sufficient funding for all programs--all algos the same, reset(), budget: 10',
+'Notes: 4) Really poor reviewers--algos roughly same!, reset(), standard_deviation: 1.0, num_sims: 100']
+
 st.selectbox("Interesting Parameterizations", options=options,
             on_change=apply_options,
             key='interesting_params')
@@ -477,12 +534,19 @@ def run_n_wrapper():
                     SS.algo_names, 
                     SS.num_projects)
 
+
+st.text_input("Notes:", value=SS.Notes, on_change=generic_handler,
+                args=('notes_input', 'Notes'),
+                key='notes_input')
+                
 options = [1, 2, 10, 100]
 st.radio("Run N simulations", options=options, 
           index=options.index(SS.num_sims), 
           on_change=run_n_wrapper, 
           key='simulation_radio_btn')
 st.button("Rerun as configured", on_click=run_n_wrapper)
+
+st.dataframe(pd.DataFrame(SS.sessions))
 
 
 g = """

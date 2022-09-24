@@ -15,5 +15,18 @@ class TestUtil(unittest.TestCase):
         top_n = util.select_top_n(cand_top_n, n)
         self.assertEqual(top_n[0]['id'], cand_top_n[1]['id'])
 
+    def test_random_n(self):
+        budget = 2
+        min_threshold = 2.0
+        candidates = [{'id':'Proj Below', 'score': 1.5}] * 100
+        candidates.extend([{'id':'Proj Above', 'score': 2.0}] * 2)
+        for i in range(100):
+            winners = \
+                util.select_random_n(budget, candidates, min_threshold)
+            self.assertEqual(len(winners), budget)
+            for winner in winners:
+                self.assertEqual(winner['id'], 'Proj Above')
+
+
 if __name__ == '__main__':
     unittest.main()
