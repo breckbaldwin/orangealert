@@ -1,5 +1,6 @@
 from collections import defaultdict
 from turtle import onclick
+from numpy import generic
 import streamlit as st
 #st.set_page_config(layout="wide")
 import pandas as pd
@@ -24,7 +25,7 @@ def reset():
     SS.budget = 2
     SS.hybrid_top_n_budget = SS.budget//2
     SS.funding_amount_in_millions = 1.0
-    SS.num_funding_rounds = 4
+    SS.num_funding_rounds = 5
     SS.reputation_increase_per_funding_round = .5
     SS.minimum_threshold = 1.0
     SS.num_sims = 1
@@ -36,6 +37,12 @@ def reset():
     SS.proj_skill_values = [1.0] * SS.num_projects
     SS.show_explanation = False
     SS.Notes = 'reset()'
+    SS.show_top_n = True,
+    SS.show_rand_n = True,
+    SS.show_hybrid = False
+    SS.y_dimension = 'total funds'
+    SS.sel_run_1 = 'latest'
+    SS.sel_run_2 = 'latest'
 
 session_config_values = ['Notes', 'standard_deviation', 'budget', 'funding_amount_in_millions', 'num_funding_rounds', 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
 'proj_skill_values', 'accum_df']
@@ -284,8 +291,9 @@ So how do we manage our stupid human reviewer simulation? We assume they are goi
 The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
 """)
 
+(col1, col2) = st.columns(2)
 standard_deviation =\
-    st.slider("67% of scores fall within specified +/- range in grade points",   
+    col1.slider("67% of scores fall within specified +/- range in grade points",   
               min_value=0.0, max_value=1.0, step=0.25, value=SS.standard_deviation)
 
 if 'df' not in SS:
@@ -372,7 +380,7 @@ Below we have the controls for a Top N algorithm simulation.
 def generic_handler(widget_name, variable):
     SS[variable] = SS[widget_name]
 
-st.slider(("Budget in millions per cycle--each" + 
+col2.slider(("Budget in millions per cycle--each" + 
             "award is $1 million?"), 
             min_value=2, max_value=10, step=2, value=SS.budget, 
             on_change=generic_handler,
@@ -380,8 +388,6 @@ st.slider(("Budget in millions per cycle--each" +
             key='budget slider')
 
 hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
-st.write(f"Hybrid Top N={SS.hybrid_top_n_budget} Random N={hybrid_random_n_budget}")
-
 
 if SS.show_explanation:
     exp = st.expander("Show one round of funding")
@@ -422,13 +428,13 @@ Proposals tend to either be OMG this should be funded with a long tail of less e
 
 (col1, col2, col3) = st.columns(3)
 
-col1.slider("How many funding cycles?", min_value=1, 
-            max_value=10, step=1, value=SS.num_funding_rounds,
-            on_change=generic_handler,
-            args=('funding slider', 'num_funding_rounds'),
-            key='funding slider')
+#col1.slider("How many funding cycles?", min_value=1, 
+#            max_value=10, step=1, value=SS.num_funding_rounds,
+#            on_change=generic_handler,
+#            args=('funding slider', 'num_funding_rounds'),
+#            key='funding slider')
 
-col2.slider("How much increase in reputation per funding award", 
+col1.slider("How much increase in reputation per funding award", 
                 min_value=0.0, 
                 max_value=2.0, 
                 step=.25,
@@ -438,7 +444,7 @@ col2.slider("How much increase in reputation per funding award",
                       'reputation_increase_per_funding_round'),
                 key='reputation slider')
 
-col3.slider("Minimum threshold for funding",
+col2.slider("Minimum threshold for funding",
             min_value=0.0,
             max_value=3.0,
             step=.25,
@@ -480,43 +486,83 @@ options = ['Custom',
 'Notes: 1) Reset to defaults, reset()',
 'Notes: 2) No reputation increase--algos roughly same, reset(), reputation_increase_per_funding_round: 0.0, num_sims: 100',
 'Notes: 3) Sufficient funding for all programs--all algos the same, reset(), budget: 10',
-'Notes: 4) Really poor reviewers--algos roughly same!, reset(), standard_deviation: 1.0, num_sims: 100']
+'Notes: 4) Really poor reviewers--algos roughly same!, reset(), standard_deviation: 1.0, num_sims: 100',
+'Notes: 5) High miniumum score--algos same, reset(), minimum_threshold: 2.0, num_sims: 100']
 
-st.selectbox("Interesting Parameterizations", options=options,
+col3.selectbox("Interesting Parameterizations", options=options,
             on_change=apply_options,
             key='interesting_params')
 
-exp = st.expander("Show Last Simulation Detail Graph")
-if SS.num_sims > 1:
-    exp.info("Only last simulation results graphed since the number of simulations is > 1")
-
-(col1, col2, col3) = exp.columns(3)
-show_top_n = col1.checkbox("Top N", value=True)
-show_rand_n = col2.checkbox("Random N", value=True)
-show_hybrid = col3.checkbox("Hybrid", value=False)
-
-y_dimension = 'total funds'
-y_dimension = exp.radio("Y dimension",
-                options=['total funds', 'draw', 'reputation', 'score', 'skill'],
-                horizontal=True)
-plot = render3(SS.df, y_dimension, show_top_n, show_rand_n, show_hybrid)
-if plot is not None:
-    exp.pyplot(p9.ggplot.draw(plot))
+show_detail_graph = col1.checkbox("Show Last Simulation Detail Graph", 
+                                    value=True)
+#if SS.num_sims > 1:
+#    col1.info("Only last simulation results graphed since the number of simulations is > 1")
 
 
-y_units= 'count'
-y_units = st.radio("Y units", ['count', 'percent'], index=0)
+def plot_details(out):
+    options = ['total funds', 'draw', 'reputation', 'score', 'skill']
+    plot = render3(SS.df, SS.y_dimension, SS.show_top_n, SS.show_rand_n, 
+                    SS.show_hybrid)
+    if plot is not None:
+        out.pyplot(p9.ggplot.draw(plot))
+    out.checkbox("Top N", value=SS.show_top_n, 
+                on_change=generic_handler,
+                args= ('show_top_n_cb', 'show_top_n'),
+                key='show_top_n_cb')
+    out.checkbox("Random N", value=SS.show_rand_n,
+                on_change=generic_handler,
+                args= ('show_rand_n_cb', 'show_rand_n'),
+                key='show_rand_n_cb')
+    out.checkbox("Hybrid", value=SS.show_hybrid, 
+                on_change=generic_handler,
+                args= ('show_hybrid_cb', 'show_hybrid'),
+                key='show_hybrid_cb')
+    y_dimension = out.selectbox("Y dimension",
+                options=options,
+                index=options.index(SS.y_dimension),
+                on_change=generic_handler,
+                args=('select_y_dim', 'y_dimension'),
+                key='select_y_dim')
 
+def plot_results(col, i):
+    y_units= 'count'
+    units = ['count', 'percent']
+    runs = list(range(len(SS.sessions))) + ['latest']
+    run_id = SS[f'sel_run_{i}']
+    if run_id == 'latest':
+        run_id = -1
+    accum_df = SS.sessions[run_id]['accum_df']
+    #st.dataframe(SS.accum_df)
+    plot = (p9.ggplot(accum_df, p9.aes(x='funding bin',      
+                                          y=y_units,       
+                                          fill='algo')) 
+            + p9.geom_col(position='dodge')
+    )
+    if y_units == 'percent':
+        plot = plot + p9.scale_y_continuous(labels=percent_format())
+    col.pyplot(p9.ggplot.draw(plot))
+    col.radio("Y units", units,
+               index=units.index(SS.y_units),
+               key=f"y_radio_{i}")
+    col.selectbox("Run to show",
+                    runs,
+                    index=runs.index(SS[f'sel_run_{i}']),
+                    on_change=generic_handler,
+                    args=(f'run_id_select_box_{i}',
+                            f'sel_run_{i}'),
+                    key=f'run_id_selectbox_{i}')
 
-#st.dataframe(SS.accum_df)
-plot = (p9.ggplot(SS.accum_df, p9.aes(x='funding bin', y=y_units, fill='algo')) 
-      + p9.geom_col(position='dodge')
-)
+num_plots = col2.selectbox("Number of plots", options=[1,2])
+if show_detail_graph:
+    num_plots += 1
+cols = st.columns(num_plots)
 
-if y_units == 'percent':
-    plot = plot + p9.scale_y_continuous(labels=percent_format())
+for i in range(num_plots):
+    if show_detail_graph and i == 0:
+        plot_details(cols[i])
+    else:
+        plot_results(cols[i], i)
 
-st.pyplot(p9.ggplot.draw(plot))
 
 def run_n_wrapper():
     SS.num_sims = SS.simulation_radio_btn
