@@ -39,8 +39,8 @@ def select_random_n(num_funding_slots, rand_n, funding_threshold):
                                 funding_threshold - threshold_drop]
         if len(random_candidates) < num_funding_slots:
             threshold_drop += .5
-    if threshold_drop > 0:
-        st.info(f"Standards have been lowered! Threshold lowered by {threshold_drop:.2f} for iteration")
+    #if threshold_drop > 0:
+        #st.info(f"Standards have been lowered! Threshold lowered by {threshold_drop:.2f} for iteration")
     return random.sample(random_candidates, num_funding_slots)
 
 def add_score(algorithm_simulation_data, standard_deviation, round):
