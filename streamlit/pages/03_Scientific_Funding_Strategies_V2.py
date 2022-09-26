@@ -43,6 +43,8 @@ def reset():
     SS.y_dimension = 'total funds'
     SS.sel_run_1 = 'latest'
     SS.sel_run_2 = 'latest'
+    SS.y_units_1 = 'percent'
+    SS.y_units_2 = 'percent'
 
 session_config_values = ['Notes', 'standard_deviation', 'budget', 'funding_amount_in_millions', 'num_funding_rounds', 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
 'proj_skill_values', 'accum_df']
@@ -150,6 +152,22 @@ def run_n_simulations(num_sims, proj_skill_values, names,
         #        ', '.join(bins_perc)
     SS.sessions.append(config)
 
+def run_n_wrapper():
+    SS.num_sims = SS.simulation_radio_btn
+    SS.Notes = ''
+    run_n_simulations(SS.num_sims, 
+                    SS.proj_skill_values, 
+                    SS.names,
+                    SS.num_funding_rounds,
+                    SS.standard_deviation, 
+                    SS.reputation_increase_per_funding_round, 
+                    SS.budget, 
+                    SS.minimum_threshold,
+                    SS.hybrid_top_n_budget,
+                    SS.algo_names, 
+                    SS.num_projects)
+
+
 def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
     if not (show_top_n or show_random_n or show_hybrid):
         st.info("select a dataset to view")
@@ -244,21 +262,6 @@ Steps are:
 3. The skill is unavailable to mere human evaluators, but Y,GR are functioning as god here-- so you get access to the source code.
 """)
 
-if SS.show_explanation:
-    st.write("Initial Skills Assignment")
-
-exp = st.expander("Set project abilities")
-if exp.checkbox("Apply Bell curve grading", value=False):
-    SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
-cols = exp.columns(SS.num_projects)
-for i in range(SS.num_projects):
-    SS.proj_skill_values[i] = \
-        cols[i].radio(f"Proj {SS.names[i]}", 
-                        SS.skills, 
-                        index=SS.skills.index(SS.proj_skill_values[i]),
-                        key=i, 
-                        horizontal=False)
-
 #top_n_df = pd.DataFrame(top_n)
 if SS.show_explanation:
     exp = st.expander("Stupid Human Simulation: Drawing a score from the bell curve", expanded=False)
@@ -291,7 +294,26 @@ So how do we manage our stupid human reviewer simulation? We assume they are goi
 The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
 """)
 
-(col1, col2) = st.columns(2)
+(col0, col1, col2) = st.columns(3)
+
+exp = st.expander("Set skills for projects")
+if exp.checkbox("Apply Bell curve grading", value=False):
+    SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
+else:
+    SS.proj_skill_values = [1.0] * SS.num_projects
+
+
+cols = exp.columns(SS.num_projects)
+for i in range(SS.num_projects):
+    SS.proj_skill_values[i] = \
+        cols[i].radio(f"Proj {SS.names[i]}", 
+                        SS.skills, 
+                        index=SS.skills.index(SS.proj_skill_values[i]),
+                        key=i, 
+                        horizontal=False)
+
+
+
 standard_deviation =\
     col1.slider("67% of scores fall within specified +/- range in grade points",   
               min_value=0.0, max_value=1.0, step=0.25, value=SS.standard_deviation)
@@ -299,6 +321,8 @@ standard_deviation =\
 if 'df' not in SS:
     SS.df = None
     SS.accum_df = None
+
+
 
 
 def run_sim_as_configured():
@@ -483,11 +507,11 @@ def apply_options():
     run_sim_as_configured()
 
 options = ['Custom', 
-'Notes: 1) Reset to defaults, reset()',
-'Notes: 2) No reputation increase--algos roughly same, reset(), reputation_increase_per_funding_round: 0.0, num_sims: 100',
-'Notes: 3) Sufficient funding for all programs--all algos the same, reset(), budget: 10',
-'Notes: 4) Really poor reviewers--algos roughly same!, reset(), standard_deviation: 1.0, num_sims: 100',
-'Notes: 5) High miniumum score--algos same, reset(), minimum_threshold: 2.0, num_sims: 100']
+'Notes: A) Reset to defaults, reset()',
+'Notes: B) No reputation increase--algos roughly same, reset(), reputation_increase_per_funding_round: 0.0, num_sims: 100',
+'Notes: C) Sufficient funding for all programs--all algos the same, reset(), budget: 10',
+'Notes: D) Really poor reviewers--algos roughly same!, reset(), standard_deviation: 1.0, num_sims: 100',
+'Notes: E) High miniumum score--algos same, reset(), minimum_threshold: 2.0, num_sims: 100']
 
 col3.selectbox("Interesting Parameterizations", options=options,
             on_change=apply_options,
@@ -495,6 +519,14 @@ col3.selectbox("Interesting Parameterizations", options=options,
 
 show_detail_graph = col1.checkbox("Show Last Simulation Detail Graph", 
                                     value=True)
+
+options = [1, 2, 10, 100]
+col3.radio("Run N simulations", options=options, 
+          index=options.index(SS.num_sims), 
+          on_change=run_n_wrapper, 
+          key='simulation_radio_btn',
+          horizontal=True)
+col1.button("Rerun as configured", on_click=run_n_wrapper)
 #if SS.num_sims > 1:
 #    col1.info("Only last simulation results graphed since the number of simulations is > 1")
 
@@ -525,59 +557,52 @@ def plot_details(out):
                 key='select_y_dim')
 
 def plot_results(col, i):
-    y_units= 'count'
+    y_units_key_i = f'y_units_{i}'
+    y_run_id_select_box_i = f'run_id_selectbox_{i}'
+    sel_run_i = f'sel_run_{i}'
+    y_radio_i = f'y_radio_{i}'
     units = ['count', 'percent']
     runs = list(range(len(SS.sessions))) + ['latest']
-    run_id = SS[f'sel_run_{i}']
+    run_id = SS[sel_run_i]
     if run_id == 'latest':
         run_id = -1
     accum_df = SS.sessions[run_id]['accum_df']
     #st.dataframe(SS.accum_df)
-    plot = (p9.ggplot(accum_df, p9.aes(x='funding bin',      
-                                          y=y_units,       
+    plot = (p9.ggplot(accum_df, p9.aes(x='funding bin',   
+                                          y=SS[y_units_key_i],       
                                           fill='algo')) 
             + p9.geom_col(position='dodge')
     )
-    if y_units == 'percent':
+    if SS[y_units_key_i] == 'percent':
         plot = plot + p9.scale_y_continuous(labels=percent_format())
     col.pyplot(p9.ggplot.draw(plot))
     col.radio("Y units", units,
-               index=units.index(SS.y_units),
-               key=f"y_radio_{i}")
+               index=units.index(SS[y_units_key_i]),
+               on_change=generic_handler,
+               args=(y_radio_i, y_units_key_i),
+               key=y_radio_i)
     col.selectbox("Run to show",
                     runs,
-                    index=runs.index(SS[f'sel_run_{i}']),
+                    index=runs.index(SS[sel_run_i]),
                     on_change=generic_handler,
-                    args=(f'run_id_select_box_{i}',
-                            f'sel_run_{i}'),
-                    key=f'run_id_selectbox_{i}')
+                    args=(y_run_id_select_box_i, sel_run_i),
+                    key=y_run_id_select_box_i)
 
 num_plots = col2.selectbox("Number of plots", options=[1,2])
 if show_detail_graph:
     num_plots += 1
-cols = st.columns(num_plots)
+    cols = st.columns(num_plots)
+    for i in range(num_plots):
+        if i == 0:
+            plot_details(cols[i])
+        else:
+            plot_results(cols[i], i)
+else:
+    cols = st.columns(num_plots)
+    for i in range(num_plots):
+        plot_results(cols[i], i + 1)
 
-for i in range(num_plots):
-    if show_detail_graph and i == 0:
-        plot_details(cols[i])
-    else:
-        plot_results(cols[i], i)
 
-
-def run_n_wrapper():
-    SS.num_sims = SS.simulation_radio_btn
-    SS.Notes = ''
-    run_n_simulations(SS.num_sims, 
-                    SS.proj_skill_values, 
-                    SS.names,
-                    SS.num_funding_rounds,
-                    SS.standard_deviation, 
-                    SS.reputation_increase_per_funding_round, 
-                    SS.budget, 
-                    SS.minimum_threshold,
-                    SS.hybrid_top_n_budget,
-                    SS.algo_names, 
-                    SS.num_projects)
 
 
 def notes_handler():
@@ -597,12 +622,7 @@ st.selectbox("Graph run", options=range(len(SS.sessions)),
             on_change=render_session,
             key='graph_session_select')
                 
-options = [1, 2, 10, 100]
-st.radio("Run N simulations", options=options, 
-          index=options.index(SS.num_sims), 
-          on_change=run_n_wrapper, 
-          key='simulation_radio_btn')
-st.button("Rerun as configured", on_click=run_n_wrapper)
+
 
 
 st.info(SS.Notes)
