@@ -10,13 +10,17 @@ import copy
 import plotnine as p9
 import re
 from mizani.formatters import percent_format
+from numpy.random import default_rng
+import random
 
-
+RNG = default_rng()
 sys.path.append("pages/")
 
 import util
 
 SS = st.session_state
+
+
 
 def reset():
     SS.df = None
@@ -45,9 +49,17 @@ def reset():
     SS.sel_run_2 = 'latest'
     SS.y_units_1 = 'percent'
     SS.y_units_2 = 'percent'
+    SS.currently_being_scored = 0
+    SS.score_individually = False
+
 
 session_config_values = ['Notes', 'standard_deviation', 'budget', 'funding_amount_in_millions', 'num_funding_rounds', 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
 'proj_skill_values', 'accum_df']
+
+
+def generic_handler(widget_name, variable):
+    SS[variable] = SS[widget_name]
+
 
 if 'df' not in SS:
     reset()
@@ -77,7 +89,8 @@ def run_simulation(proj_data_2,
         top_n = copy.deepcopy(top_n)
         rand_n = copy.deepcopy(rand_n)
         hybrid = copy.deepcopy(hybrid)
-        util.add_score([top_n, rand_n, hybrid], standard_deviation, round_num)
+        util.add_score([top_n, rand_n, hybrid], standard_deviation,
+                        round_num)
 
         top_n_winners = util.select_top_n(top_n, budget)
         util.distribute_awards(top_n_winners, 1,
@@ -262,6 +275,22 @@ Steps are:
 3. The skill is unavailable to mere human evaluators, but Y,GR are functioning as god here-- so you get access to the source code.
 """)
 
+exp = st.expander("Set skills for projects")
+if exp.checkbox("Apply Bell curve grading", value=False):
+    SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
+else:
+    SS.proj_skill_values = [1.0] * SS.num_projects
+
+cols = exp.columns(SS.num_projects)
+for i in range(SS.num_projects):
+    SS.proj_skill_values[i] = \
+        cols[i].radio(f"Proj {SS.names[i]}", 
+                        SS.skills, 
+                        index=SS.skills.index(SS.proj_skill_values[i]),
+                        key=i, 
+                        horizontal=False)
+
+
 #top_n_df = pd.DataFrame(top_n)
 if SS.show_explanation:
     exp = st.expander("Stupid Human Simulation: Drawing a score from the bell curve", expanded=False)
@@ -294,36 +323,55 @@ So how do we manage our stupid human reviewer simulation? We assume they are goi
 The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
 """)
 
-(col0, col1, col2) = st.columns(3)
+(col1, col2, col3) = st.columns(3)
 
-exp = st.expander("Set skills for projects")
-if exp.checkbox("Apply Bell curve grading", value=False):
-    SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
-else:
-    SS.proj_skill_values = [1.0] * SS.num_projects
+def std_dev_handler():
+    SS.standard_deviation = SS.stand_dev_slider
+    SS.currently_being_scored = 0
+    col1.info("Resetting previous scores")
 
+col1.slider("67% of scores fall within specified +/- range in grade points",   
+            min_value=0.0, max_value=1.0, step=0.25,
+            on_change=std_dev_handler, 
+            value=SS.standard_deviation,
+            key='stand_dev_slider')
 
-cols = exp.columns(SS.num_projects)
-for i in range(SS.num_projects):
-    SS.proj_skill_values[i] = \
-        cols[i].radio(f"Proj {SS.names[i]}", 
-                        SS.skills, 
-                        index=SS.skills.index(SS.proj_skill_values[i]),
-                        key=i, 
-                        horizontal=False)
+def add_score():
+    draw = RNG.normal(0, SS.standard_deviation)
+    SS.proj_data[SS.currently_being_scored]['draw'] = draw
 
+if SS.show_explanation:
+    if col1.checkbox("Score Individually", 
+                value=SS.score_individually,
+                on_change=generic_handler,
+                args=('score_indiv_cb', 'score_individually'),
+                key='score_indiv_cb'):
+        col1.write("on")
+    else:
+        col1.write("off")
+    
+    if SS.score_individually:
+        if 'proj_data' not in SS:
+            SS.proj_data = util.init(SS.proj_skill_values, SS.names)
+        col2.button(f"Score Proj {SS.names[SS.currently_being_scored]}",
+                on_click=add_score,
+                key=f"draw_button")
+        SS.currently_being_scored = \
+            (SS.currently_being_scored + 1) % SS.num_projects
+        disp_df = pd.DataFrame(SS.proj_data)
+        disp_df = disp_df.loc[:, disp_df.columns.isin(['id', 'skill', 'draw', 
+                                                        'score', 'reputation'])]
+        disp_df = disp_df[disp_df['draw'].notnull()]
+        
+        col3.dataframe(disp_df.style.format(subset=['draw', 'skill'], formatter='{:.2f}'))
 
-
-standard_deviation =\
-    col1.slider("67% of scores fall within specified +/- range in grade points",   
-              min_value=0.0, max_value=1.0, step=0.25, value=SS.standard_deviation)
+    exp.markdown("""
+Each round of funding will draw a score and add it to the skill + reputation scores for the project. The reputation is 0 now, but with successful funding it will grow which reflects the benefit of a project being funded for subsequent rounds of funding. Reputation is how the rich get richer in this simulation which may or may not be a good idea--and it is central to the algorithms that we are experimenting with below.
+""")
 
 if 'df' not in SS:
     SS.df = None
     SS.accum_df = None
-
-
-
 
 def run_sim_as_configured():
     run_n_simulations(SS.num_sims, 
@@ -337,8 +385,6 @@ def run_sim_as_configured():
                     SS.hybrid_top_n_budget,
                     SS.algo_names, 
                     SS.num_projects)
-    
-
 
 one_run_button_description = "Run simulation once"
 if SS.show_explanation:
@@ -372,13 +418,7 @@ if SS.df is None:
                           SS.algo_names, 
                           SS.num_projects)
         
-if SS.show_explanation:
-    exp = st.expander("Show drawn Scores", expanded=False)
-    res_df = SS.df[(SS.df['algo'] == 'Top N') & (SS.df['round'] == 1)]
-    exp.dataframe(res_df.loc[:, res_df.columns.isin(['id', 'draw'])])
-    exp.markdown("""
-Each round of funding will draw a score and add it to the skill + reputation scores for the project. The reputation is 0 now, but with successful funding it will grow which reflects the benefit of a project being funded for subsequent rounds of funding. Reputation is how the rich get richer in this simulation which may or may not be a good idea--and it is central to the algorithms that we are experimenting with below.
-""")
+
 
     exp = st.expander("The Top N Algorithm")
     exp.markdown("""
@@ -401,8 +441,8 @@ Below we have the controls for a Top N algorithm simulation.
 
 """)
 
-def generic_handler(widget_name, variable):
-    SS[variable] = SS[widget_name]
+if SS.show_explanation:
+    (col1_empty, col2, col3_empty) = st.columns(3)
 
 col2.slider(("Budget in millions per cycle--each" + 
             "award is $1 million?"), 
@@ -417,7 +457,7 @@ if SS.show_explanation:
     exp = st.expander("Show one round of funding")
     (col1, col2) = exp.columns(2)
     col1.write("All Projects")
-    top_n_df = res_df.loc[:, SS.df.columns.isin(['id', 'skill', 'draw',
+    top_n_df = SS.df.loc[:, SS.df.columns.isin(['algo', 'id', 'skill', 'draw',
                                              'score', 'total funds'])]
     col1.dataframe(top_n_df)
     col2.write("Winning Projects")
@@ -444,6 +484,34 @@ This here is **very** threatening to metocratic ideals by making clear that all 
 - Work hard, get a PhD, write a difficult proposal to qualifiy to be considered for funding with a score above a threshold. If more proposals are above threshold than the budget allows then select randomly. Brutal no? 
 """)
 
+
+if SS.show_explanation:
+    (col1_empty, col2_empty, col3) = st.columns(3)
+
+col3.slider("Minimum threshold for funding",
+            min_value=0.0,
+            max_value=3.0,
+            step=.25,
+            value=SS.minimum_threshold,
+            on_change=generic_handler,
+            args=('threshold slider', 'minimum_threshold'),
+            key='threshold slider')
+
+if SS.show_explanation:
+    exp = st.expander("Show one round of funding")
+    (col1, col2) = exp.columns(2)
+    col1.write("All Projects")
+    rand_n_df = SS.df[SS.df['algo'] == 'Random N']
+    display_df = rand_n_df.loc[:, SS.df.columns.isin(['algo', 'id', 'skill', 'draw',
+                                             'score', 'total funds'])]
+    col1.dataframe(display_df)
+    col2.write("Winning Projects")
+    col2.dataframe(display_df[display_df['total funds'] == 1.0])
+
+
+
+
+if SS.show_explanation:
     exp = st.expander("Hybrid: The reality program managers would accept")
 
     exp.markdown("""
@@ -467,15 +535,6 @@ col1.slider("How much increase in reputation per funding award",
                 args=('reputation slider', 
                       'reputation_increase_per_funding_round'),
                 key='reputation slider')
-
-col2.slider("Minimum threshold for funding",
-            min_value=0.0,
-            max_value=3.0,
-            step=.25,
-            value=SS.minimum_threshold,
-            on_change=generic_handler,
-            args=('threshold slider', 'minimum_threshold'),
-            key='threshold slider')
 
 if SS.show_explanation:
     exp1 = col1.expander("Details")
