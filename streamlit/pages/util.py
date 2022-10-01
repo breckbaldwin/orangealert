@@ -14,15 +14,15 @@ def init(proj_start_values, names):
     for i in reversed(range(len(proj_start_values))): #keeps chart legend order
         jitter += 1
         top_n[i] = {'id': f"Proj {names[i]}", 
-                    'algo': None,
-                    'reputation': 0.0,
-                    'draw': 0.0,
-                    'score': 0.0, 
+                    'draw': None,
                     'skill': proj_start_values[i], 
+                    'reputation': 0.0,                    
+                    'score': None, 
                     'total funds': 0.0,
                     'cumulative benefit': 0,
                     'y_offset': jitter,
-                    'round': 0}
+                    'round': 0,
+                    'algo': None}
     return (top_n)
 
 def compute_benefit(winner):
