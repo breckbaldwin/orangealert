@@ -1,5 +1,4 @@
 from collections import defaultdict
-from turtle import onclick
 from numpy import generic
 import streamlit as st
 #st.set_page_config(layout="wide")
@@ -54,7 +53,9 @@ def reset():
     SS.sd_writeup_reflection_of_skill = .5
     SS.sd_reviewer_accuracy = .5
 
-session_config_values = ['Notes', 'standard_deviation', 'budget', 'funding_amount_in_millions', 'num_funding_rounds', 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
+session_config_values = ['Notes', 'standard_deviation', 'budget', 
+'funding_amount_in_millions', 'num_funding_rounds', 
+'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
 'proj_skill_values', 'accum_df']
 
 def generic_handler(widget_name, variable):
@@ -235,12 +236,11 @@ def accum_gt_counts(num_funding_rounds, algo_names, sim_df):
                             '>= count'] = gt_count
 
 st.title("How Algorithims Influence Research Diversity")
-if SS.show_explanation:
-    st.markdown("A simulation fueled exploration")
-    st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
+st.markdown("A simulation fueled exploration")
+st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
                  "\nSeptember, 2022"))
 
-st.checkbox("Show Explanation", value=SS.show_explanation, 
+st.checkbox("Show Narrative", value=SS.show_explanation, 
             on_change=generic_handler,
             args=('show_explanation_cb', 'show_explanation'),
             key='show_explanation_cb')
@@ -250,40 +250,36 @@ if SS.show_explanation:
     exp.markdown("""
 ## Welcome to the simulation
 
-This is going to be a _little_ different from a standard blog post and an experiment in exposing you, gentle reader, (Y,GR) to a more dynamic way to explore ideas you may not be familliar with. 
+Lets look at how one might award limited opportunties for research funding, getting into college or accepting conference papers. This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is ().
 
-## Where is the juice? 
-
-To put it bluntly, this article talks about approaches to research grant funding which I assume you don't really have opinions about or particularly care about. The juice or what you get out of reading/interacting with this is:
-- Lots of important decisions get made with the same algorithms I will be covering. Admissions, job applications and who gets picked for each side in a school yard kickball game.
-- Y,GR will learn properties of the algorithms by running simulations with brutally short explanations. Experiential learners rejoyce! I'm your boy.
-- No rule of three third point--got simulations to cover....
+TL;DR The simulation covers 1) a 'Top N' approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy, 2) a 'Random N' approach that awards N slots randomly to candidates that pass a minumum score threshold, and 3) a 'Hybrid' approach that blends the two. 
 
 ## Scoring candidates
 
-Selection of 'winners' of limited resources often score candidates as a first step. This work focuses on what is done **after** the candidate scoring step has happened. But we still need a scoring step. The structure is as follows:
+I'll use research funding as the use-case for the simulation with the following properties:
 
-- We have 10 projects, A-J
-- The projects have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scales. 
-- The projects can have the same skill or different skills, you get to play around with it.
-""")
+- We have 10 projects, A-J applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. Similar rationals can be made for the other use-cases of admissions or conference papers. 
+- The projects have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that reflect the actual ability of the project team. 
 
-    exp.markdown("""### Simulate score as a function of skill
+## Playing god
 
-You'll be simulating wrecked lives as well as meteoric ascensions to greatness in no time, be patient. Who lets Y,GR play god? We do.
+You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time. But skills have to be assigned. There are three options plus just setting scores as your omnipotence decrees:
 
-Steps are:
+1. Bell Curve: Mostly C's, some B's and D's and an outlier A and F.
+2. God's Gift: One genius project, A, in a collection of mediocrity, D's.
+3. A Mother's Love: All projects equally skilled but mother's a realist and knows they are pretty dumb (C's)
 
-1. Assign skill values to the projects. The default is everyone is a '1.0'. If you choose to remain a communist you can leave them, otherwise you can mix them up a bit. 
-2. There is a 'Bell Curve' button to recreate Y,GR's harsher grading environments. 
-3. The skill is unavailable to mere human evaluators, but Y,GR are functioning as god here-- so you get access to the source code.
 """)
 
 exp = st.expander("Set skills for projects")
-if exp.checkbox("Apply Bell curve grading", value=False):
-    SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
-else:
-    SS.proj_skill_values = [1.0] * SS.num_projects
+exp.radio("Suggested Skill Collections", 
+    options=["Bell Curve", "God's Gift is Amongst Us", "A Mother's Love"],
+    index=2,
+    horizontal=True)
+
+SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
+
+SS.proj_skill_values = [2.0] * SS.num_projects
 
 cols = exp.columns(SS.num_projects)
 for i in range(SS.num_projects):
@@ -297,8 +293,15 @@ for i in range(SS.num_projects):
 
 #top_n_df = pd.DataFrame(top_n)
 if SS.show_explanation:
-    exp = st.expander("Fickle Human Simulation: Drawing a score from the bell curve", expanded=False)
+    exp = st.expander("Fickle Human Simulation", expanded=False)
     exp.markdown("""
+While you, god, know the skills assigned above, mere mortals however must:
+
+1. Write a proposal driven by the projects assigned skill.
+2. Evaluate the proposal in an attempt to determine the skill of the project.
+
+
+
 Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
 
 As alluded to above, only god or the simulation runner knows the true skill behind a project represented in a value between 0.0 and 4.0. But mere humans will be attempting to assign a score to each project's funding application.
@@ -492,12 +495,12 @@ if 'df' not in SS:
     SS.df = None
     SS.accum_df = None
 
-one_run_button_description = "Draw scores for all projects"
-if SS.show_explanation:
-    if st.button(one_run_button_description):
-        run_sim_as_configured()
-        render_scoring_df(SS.df[(SS.df['algo'] == 'Top N') & 
-                                (SS.df['round'] == 1)], col2_wide)
+#one_run_button_description = "Draw scores for all projects"
+#if SS.show_explanation:
+#    if st.button(one_run_button_description):
+#        run_sim_as_configured()
+#        render_scoring_df(SS.df[(SS.df['algo'] == 'Top N') & 
+#r                                (SS.df['round'] == 1)], col2_wide)
 
 # if SS.df is None:
 #     if SS.show_explanation:
@@ -519,28 +522,24 @@ if SS.show_explanation:
 
 if SS.show_explanation:
     exp = st.expander("Top N Algorithm")
-    exp.markdown("""
+    exp.markdown(f"""
 ## Algorithmic Meritocracy: Top N
 
 The Top N algorithm will take the available budget, constrained to \$1 million awards, and parcel out budget starting at the top scoring project. If we have \$3 million in the budget, then the top 3 scoring projects get funding. If there are ties for the score then pick from the order that happens to be in the list. 
-
-Since the default order in this implementation will always choose alphabetically 'Proj A' before 'Proj B' if they have the same score we see programmer lazyness introducing bias.
 
 Repeating the algorithm:
 
 1. Select Top N proposals by score where N = millions of dollars of budget.
 2. For each awarded proposal, increment the total funding by $1 million 
-3. For each awarded proposal Increment the reputation by .5 (half a grade point)
+3. For each awarded proposal Increment the reputation by {SS.reputation_increase_per_funding_round} as selected.
 
 ## Lets spend some money!
 
-Below we have the controls for a Top N algorithm simulation. 
-
-
+Below we have the controls for a Top N algorithm simulation.
 """)
 
 if SS.show_explanation:
-    (col1_empty, col2, col3_empty) = st.columns(3)
+    (col1_empty, col2, col3) = st.columns(3)
 
 col2.slider((f"Budget: {'In millions per funding cycle--each award is $1 million' if SS.show_explanation else ''}"), 
             min_value=2, max_value=10, step=2, value=SS.budget, 
@@ -585,14 +584,14 @@ This here is **very** threatening to metocratic ideals by making clear that all 
 #if SS.show_explanation:
 #    (col1_empty, col2_, col3_empty) = st.columns(3)
 
-col2.slider("Minimum threshold for funding",
-            min_value=0.0,
-            max_value=3.0,
-            step=.25,
-            value=SS.minimum_threshold,
-            on_change=generic_handler,
-            args=('threshold slider', 'minimum_threshold'),
-            key='threshold slider')
+# col2.slider("Minimum threshold for funding",
+#             min_value=0.0,
+#             max_value=3.0,
+#             step=.25,
+#             value=SS.minimum_threshold,
+#             on_change=generic_handler,
+#             args=('threshold slider', 'minimum_threshold'),
+#             key='threshold slider')
 
 if SS.show_explanation:
     exp = st.expander("Show one round of funding")
@@ -605,23 +604,11 @@ if SS.show_explanation:
     col2.write("Winning Projects")
     col2.dataframe(display_df[display_df['total funds'] == 1.0])
 
-
-
-
 if SS.show_explanation:
     exp = st.expander("Hybrid: The reality program managers would accept")
-
     exp.markdown("""
 Proposals tend to either be OMG this should be funded with a long tail of less extraordnary efforts. Program managers, admission committees and other selection processes do feel that judgement has an important and predictively useful role which is the driving force behind the Top N algorithm. So the hybrid algorithm acknoledges that but changes that to Top N/2 where half the funding is done that way, the remainder is Random N. The ratio could be adjusted but trying to keep it simple.
 """)
-
-#(col1, col2, col3) = st.columns(3)
-
-#col1.slider("How many funding cycles?", min_value=1, 
-#            max_value=10, step=1, value=SS.num_funding_rounds,
-#            on_change=generic_handler,
-#            args=('funding slider', 'num_funding_rounds'),
-#            key='funding slider')
 
 col3.slider(f"Reputation increase: {'How much increase in reputation per funding award which is added to project score.' if SS.show_explanation else ''}", 
                 min_value=0.0, 
