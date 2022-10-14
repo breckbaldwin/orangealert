@@ -37,6 +37,8 @@ def reset():
     SS.skills = [0.0, 1.0, 2.0, 3.0, 4.0]
     SS.skills.reverse()
     SS.names = "abcdefghijklmnopqrstuvwxyz".upper()
+    SS.names = ['Amit', 'Beth', 'Chris', 'Drew', 'Enid', 'Fred', 'Gina', 'Hank',
+                'Ivor', 'Jude']
     SS.proj_skill_values = [1.0] * SS.num_projects
     SS.show_explanation = True
     SS.Notes = 'reset()'
@@ -250,24 +252,24 @@ if SS.show_explanation:
     exp.markdown("""
 ## Welcome to the simulation
 
-Lets look at how one might award limited opportunties for research funding, getting into college or accepting conference papers. This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is ().
+Lets look at how one might award limited opportunties for research funding, getting into college or accepting conference papers. This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html.
 
-TL;DR The simulation covers 1) a 'Top N' approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy, 2) a 'Random N' approach that awards N slots randomly to candidates that pass a minumum score threshold, and 3) a 'Hybrid' approach that blends the two. 
+TL;DR The simulation covers 1) a _Top N_ approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy, 2) a _Random N_ approach that awards N slots randomly to candidates that pass a minumum score threshold, and 3) a _Hybrid_ approach that blends the two. 
 
 ## Scoring candidates
 
 I'll use research funding as the use-case for the simulation with the following properties:
 
-- We have 10 projects, A-J applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. Similar rationals can be made for the other use-cases of admissions or conference papers. 
-- The projects have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that reflect the actual ability of the project team. 
+- We have 10 researchers applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. Similar rationals can be made for the other use-cases of admissions or conference papers. 
+- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. 
 
 ## Playing god
 
-You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time. But skills have to be assigned. There are three options plus just setting scores as your omnipotence decrees:
+You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time, but skills have to be assigned first. There are three options plus just setting scores as your omnipotence decrees:
 
 1. Bell Curve: Mostly C's, some B's and D's and an outlier A and F.
-2. God's Gift: One genius project, A, in a collection of mediocrity, D's.
-3. A Mother's Love: All projects equally skilled but mother's a realist and knows they are pretty dumb (C's)
+2. God's Gift: One genius, A, in a collection of mediocrity, D's.
+3. A Mother's Love: All researchers have the same mother who raised them equally skilled but mother's a realist and knows they are pretty average (C's).
 
 """)
 
@@ -284,7 +286,7 @@ SS.proj_skill_values = [2.0] * SS.num_projects
 cols = exp.columns(SS.num_projects)
 for i in range(SS.num_projects):
     SS.proj_skill_values[i] = \
-        cols[i].radio(f"Proj {SS.names[i]}", 
+        cols[i].radio(f"{SS.names[i]}", 
                         SS.skills, 
                         index=SS.skills.index(SS.proj_skill_values[i]),
                         key=i, 
@@ -295,24 +297,24 @@ for i in range(SS.num_projects):
 if SS.show_explanation:
     exp = st.expander("Fickle Human Simulation", expanded=False)
     exp.markdown("""
-While you, god, know the skills assigned above, mere mortals however must:
+While you, god, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0:
 
-1. Write a proposal driven by the projects assigned skill.
-2. Evaluate the proposal in an attempt to determine the skill of the project.
+- Vertical distance from 0,0 is how accurately the proposal refelects the actual skill of the researcher.
+
+- Horizontal distance is the reviewer's accuracy reviewing said proposal. 
+
+You, God, get to control where 68 percent of the darts will land with the two sliders below. The controls define one (1) standard deviation of random draws, aka dart throws, will land. 
+
+Below are controls and a button to throw darts.""")
 
 
-
-Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
+fii = """Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
 
 As alluded to above, only god or the simulation runner knows the true skill behind a project represented in a value between 0.0 and 4.0. But mere humans will be attempting to assign a score to each project's funding application.
 
 The score is the sum of:
 
 - Draw: The proposal writer attempts to convey their skill and the reviewer attempts to assess the skill behind the proposal. Both of these processes are imperfectly accurate. The writer may be inspired and write a better proposal than their actual skill. The other end of the continium is that they have a bad day and write a worse proposal than their actual skill or something in between. The reader has the same issues, in a good mood with a strong cup of coffee, they may assess the proposal at a higher level of skill. Weak coffee and a gloomy day may carry over to a lower assessment of skill than actual.
-
-
-
- 
 
 ## Smart humans who figured out they are stupid
 
@@ -334,7 +336,7 @@ That's enough for now, go take a statistics course if you want to know more and 
 So how do we manage our stupid human reviewer simulation? We assume they are going to be wrong a bunch but on average they will hit their numbers or be pretty close. We "virtually" throw a dart at the dark area of the above bell curve and if we hit the dark area we return the number on the x axis. If you think about it if we throw a million darts, the most common value will be the god decided skill. Pretty neat. But remember Y,GR, if you chose a bell curve for skills it has nothing to do with the measurements above, you could have been a unitarian. 
 
 The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
-""")
+"""
 
 
 def plot_draws(author_draws, reviewer_draws, proj_names):
@@ -487,9 +489,9 @@ if SS.show_explanation:
 #                + p9.geom_col(p9.aes(x='id', y='value', fill='variable')))
 #        st.pyplot(p9.ggplot.draw(plot))
         
-    exp.markdown("""
-Each round of funding will draw a score and add it to the skill + reputation scores for the project. The reputation is 0 now, but with successful funding it will grow which reflects the benefit of a project being funded for subsequent rounds of funding. Reputation is how the rich get richer in this simulation which may or may not be a good idea--and it is central to the algorithms that we are experimenting with below.
-""")
+#     exp.markdown("""
+# Each round of funding will draw a score and add it to the skill + reputation scores for the project. The reputation is 0 now, but with successful funding it will grow which reflects the benefit of a project being funded for subsequent rounds of funding. Reputation is how the rich get richer in this simulation which may or may not be a good idea--and it is central to the algorithms that we are experimenting with below.
+# """)
 
 if 'df' not in SS:
     SS.df = None
@@ -525,13 +527,19 @@ if SS.show_explanation:
     exp.markdown(f"""
 ## Algorithmic Meritocracy: Top N
 
-The Top N algorithm will take the available budget, constrained to \$1 million awards, and parcel out budget starting at the top scoring project. If we have \$3 million in the budget, then the top 3 scoring projects get funding. If there are ties for the score then pick from the order that happens to be in the list. 
+The Top N algorithm will take the available budget of {SS.budget} million, and parcel out $1 million at a time starting at the top scoring project until the budget is spent. 
+
+Score is skill + writeup execution + review execution + reputation. Everything starts on the US standard academic scale 0.0 to 4.0 but it will blow out the top end often as rounds of funding continue. 
+
+The writeup and review are random draws controlled by the sliders above and eventually reputation, currnently set at {SS.reputation_increase_per_funding_round} will accrue based on a slider below on rounds of funding. The idea being that funding will help with reputation and a positive element.
+
+If there are ties for the score then pick from the order that happens to be in the list. 
 
 Repeating the algorithm:
 
 1. Select Top N proposals by score where N = millions of dollars of budget.
 2. For each awarded proposal, increment the total funding by $1 million 
-3. For each awarded proposal Increment the reputation by {SS.reputation_increase_per_funding_round} as selected.
+3. For each awarded proposal Increment the reputation by {SS.reputation_increase_per_funding_round} as determined by the slider below.
 
 ## Lets spend some money!
 
