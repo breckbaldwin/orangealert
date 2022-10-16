@@ -45,13 +45,17 @@ def select_random_n(num_funding_slots, rand_n, funding_threshold):
         #st.info(f"Standards have been lowered! Threshold lowered by {threshold_drop:.2f} for iteration")
     return random.sample(random_candidates, num_funding_slots)
 
-def add_score(algorithm_simulation_data, standard_deviation, round):
+def add_score(algorithm_simulation_data, sd_writeup, sd_review,
+                 round):
     for i in range(len(algorithm_simulation_data[0])):
-        proposal_quality = RNG.normal(0, standard_deviation) 
+        proposal_draw = RNG.normal(0, sd_writeup)
+        review_draw = RNG.normal(0, sd_review)
         for algo_sim_data in algorithm_simulation_data:
             algo_sim_data[i]['round'] = round
-            algo_sim_data[i]['draw'] = proposal_quality
-            algo_sim_data[i]['score'] = (proposal_quality + 
+            algo_sim_data[i]['draw writeup'] = proposal_draw
+            algo_sim_data[i]['draw review'] = review_draw
+            algo_sim_data[i]['score'] = (proposal_draw + 
+                                        review_draw + 
                                         algo_sim_data[i]['skill'] + 
                                         algo_sim_data[i]['reputation'])
 

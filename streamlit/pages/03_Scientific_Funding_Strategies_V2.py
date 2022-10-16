@@ -24,7 +24,7 @@ pd.set_option('display.max_colwidth', None)
 def reset():
     SS.df = None
     SS.accum_df = None
-    SS.standard_deviation = .25
+    SS.sd_writeup_reflection_of_skill = .5
     SS.budget = 2
     SS.hybrid_top_n_budget = SS.budget//2
     SS.funding_amount_in_millions = 1.0
@@ -54,8 +54,10 @@ def reset():
     SS.score_individually = True
     SS.sd_writeup_reflection_of_skill = .5
     SS.sd_reviewer_accuracy = .5
+    SS.current_round = 1
 
-session_config_values = ['Notes', 'standard_deviation', 'budget', 
+session_config_values = ['Notes', 'sd_writeup_reflection_of_skill', 
+'sd_reviewer_accuracy', 'budget', 
 'funding_amount_in_millions', 'num_funding_rounds', 
 'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
 'proj_skill_values', 'accum_df']
@@ -69,7 +71,8 @@ if 'df' not in SS:
 
 def run_simulation(proj_data_2, 
                     num_funding_rounds, 
-                    standard_deviation,
+                    sd_writeup,
+                    sd_review,
                     reputation_increase_per_funding_round, 
                     budget,
                     hybrid_top_n_budget, 
@@ -91,7 +94,9 @@ def run_simulation(proj_data_2,
         top_n = copy.deepcopy(top_n)
         rand_n = copy.deepcopy(rand_n)
         hybrid = copy.deepcopy(hybrid)
-        util.add_score([top_n, rand_n, hybrid], standard_deviation,
+        util.add_score([top_n, rand_n, hybrid], 
+                        sd_writeup,
+                        sd_review,
                         round_num)
 
         top_n_winners = util.select_top_n(top_n, budget)
@@ -120,7 +125,8 @@ def run_simulation(proj_data_2,
 
 def run_n_simulations(num_sims, proj_skill_values, names, 
                       num_funding_rounds,
-                      standard_deviation, reputation_increase_per_funding_round, 
+                      sd_writeup,
+                      sd_review, reputation_increase_per_funding_round, 
                       budget, minimum_threshold, 
                       hybrid_top_n_budget, algo_names, num_projects):
     proj_data = util.init(proj_skill_values, names)
@@ -134,7 +140,8 @@ def run_n_simulations(num_sims, proj_skill_values, names,
     for i in range(num_sims):
         SS.df = run_simulation(proj_data, 
                                 num_funding_rounds, 
-                                standard_deviation,
+                                sd_writeup,
+                                sd_review,
                                 reputation_increase_per_funding_round, 
                                 budget,
                                 hybrid_top_n_budget,
@@ -172,7 +179,8 @@ def run_sim_as_configured():
                     SS.proj_skill_values, 
                     SS.names,
                     SS.num_funding_rounds,
-                    SS.standard_deviation, 
+                    SS.sd_writeup_reflection_of_skill,
+                    SS.sd_reviewer_accuracy,
                     SS.reputation_increase_per_funding_round, 
                     SS.budget, 
                     SS.minimum_threshold,
@@ -212,6 +220,9 @@ def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
         plot = plot + p9.scale_y_continuous(
             label=f"Y projects jittered by {offset_scale:.2f}",
             limits=[single_y - 0.5, single_y + .5])
+
+    plot = (plot + p9.xlim([0,SS.num_funding_rounds]) 
+            + p9.ylim([0,SS.num_funding_rounds]))
     
     plot = plot + p9.labels.ylab(f"Y projects jittered by {offset_scale:.2f}")
     #plot = plot + p9.theme_xkcd()
@@ -297,15 +308,15 @@ for i in range(SS.num_projects):
 if SS.show_explanation:
     exp = st.expander("Fickle Human Simulation", expanded=False)
     exp.markdown("""
-While you, god, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0:
+While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0:
 
-- Vertical distance from 0,0 is how accurately the proposal refelects the actual skill of the researcher.
+- Vertical distance from the bull's eye is how accurately the proposal refelects the actual skill of the researcher.
 
-- Horizontal distance is the reviewer's accuracy reviewing said proposal. 
+- Horizontal distance from the bull's eye is the reviewer's accuracy reviewing said proposal. 
 
-You, God, get to control where 68 percent of the darts will land with the two sliders below. The controls define one (1) standard deviation of random draws, aka dart throws, will land. 
+You get to control where 68 percent of the darts will land with the two sliders below. The controls define one (1) standard deviation of random draws, aka dart throws, will land. 
 
-Below are controls and a button to throw darts.""")
+Below are controls and a button to throw darts and a button to evaluate projects one at a time. You will see the draw. Individual draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0.0--hitting the bull's eye.""")
 
 
 fii = """Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
@@ -346,7 +357,14 @@ def plot_draws(author_draws, reviewer_draws, proj_names):
                     mapping=p9.aes(x='author_draws', y='reviewer_draws',
                                     label='id'))
     plot = plot + p9.geom_point()
-    plot = plot + p9.geom_label()
+    plot = plot + \
+        p9.geom_text(nudge_x=.1, nudge_y=.1)
+    
+    plot = plot + \
+        p9.geom_point(data=pd.DataFrame({'x':[0.0],
+                                           'y':[0.0]}),
+                        mapping=p9.aes(x='x', y='y'),
+                        fill='red')
 #    plot = plot + p9.stat_ellipse(geom='polygon', level= 0.95,
 #                                    type='norm',
 #                                    alpha=.2,
@@ -462,7 +480,7 @@ if SS.show_explanation:
         df = pd.DataFrame(SS.proj_data)
         df = df[df['draw writeup'].notnull()]
         if len(df) < SS.num_projects:
-            col1.button(f"Draw writeup and review variation for {SS.names[SS.currently_being_scored]}",
+            col1.button(f"Draw writeup and review variation for {SS.names[SS.currently_being_scored]}'s project",
                 on_click=add_score,
                 key=f"draw_button")
         if len(df) > 0:
@@ -475,6 +493,9 @@ if SS.show_explanation:
                 st.info(e)
             col1.write(f"Reason for reviewer draw: {df['reason why review is skewed'].iloc[-1][0]}")
             render_scoring_df(df, col2_wide)
+            st.markdown("""
+The score is the sum of skill + writeup draw + review draw + reputation which will become important with subsequent draws below. 
+            """)
         
         if len(df) < SS.num_projects:
             st.info(f"{SS.num_projects - len(df)} projects left to draw")
@@ -496,7 +517,6 @@ if SS.show_explanation:
 if 'df' not in SS:
     SS.df = None
     SS.accum_df = None
-
 #one_run_button_description = "Draw scores for all projects"
 #if SS.show_explanation:
 #    if st.button(one_run_button_description):
@@ -520,7 +540,34 @@ if 'df' not in SS:
 #                           SS.hybrid_top_n_budget,
 #                           SS.algo_names, 
 #                           SS.num_projects)
-        
+
+def plot_details(out):
+    options = ['total funds', 'draw', 'reputation', 'score', 'skill']
+    plot = render3(SS.df, SS.y_dimension, SS.show_top_n, 
+                    SS.show_rand_n, SS.show_hybrid)
+    if plot is not None:
+        out.pyplot(p9.ggplot.draw(plot))
+    out.checkbox("Top N", value=SS.show_top_n, 
+                on_change=generic_handler,
+                args= ('show_top_n_cb', 'show_top_n'),
+                key='show_top_n_cb')
+    out.checkbox("Random N", value=SS.show_rand_n,
+                on_change=generic_handler,
+                args= ('show_rand_n_cb', 'show_rand_n'),
+                key='show_rand_n_cb')
+    out.checkbox("Hybrid", value=SS.show_hybrid, 
+                on_change=generic_handler,
+                args= ('show_hybrid_cb', 'show_hybrid'),
+                key='show_hybrid_cb')
+    out.selectbox("Y dimension",
+                options=options,
+                index=options.index(SS.y_dimension),
+                on_change=generic_handler,
+                args=('select_y_dim', 'y_dimension'),
+                key='select_y_dim')
+
+
+
 
 if SS.show_explanation:
     exp = st.expander("Top N Algorithm")
@@ -528,10 +575,8 @@ if SS.show_explanation:
 ## Algorithmic Meritocracy: Top N
 
 The Top N algorithm will take the available budget of {SS.budget} million, and parcel out $1 million at a time starting at the top scoring project until the budget is spent. 
-
-Score is skill + writeup execution + review execution + reputation. Everything starts on the US standard academic scale 0.0 to 4.0 but it will blow out the top end often as rounds of funding continue. 
-
-The writeup and review are random draws controlled by the sliders above and eventually reputation, currnently set at {SS.reputation_increase_per_funding_round} will accrue based on a slider below on rounds of funding. The idea being that funding will help with reputation and a positive element.
+ 
+ The reputation increments {SS.reputation_increase_per_funding_round} per award--it is the mechanism that reflects the impact of having resources from previous funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or having a previously published conference paper on getting another conference paper accepted. The idea being that funding will help with reputation and is a positive factor. This reputation increase applies to the Random N model as well. 
 
 If there are ties for the score then pick from the order that happens to be in the list. 
 
@@ -539,35 +584,65 @@ Repeating the algorithm:
 
 1. Select Top N proposals by score where N = millions of dollars of budget.
 2. For each awarded proposal, increment the total funding by $1 million 
-3. For each awarded proposal Increment the reputation by {SS.reputation_increase_per_funding_round} as determined by the slider below.
+3. For each awarded proposal, increment the reputation by {SS.reputation_increase_per_funding_round}. The increment is controled by the slider below.
 
 ## Lets spend some money!
 
-Below we have the controls for a Top N algorithm simulation.
+
 """)
 
 if SS.show_explanation:
-    (col1_empty, col2, col3) = st.columns(3)
+    (col1, col2) = st.columns([1,1])
+    slider_col = col1
 
-col2.slider((f"Budget: {'In millions per funding cycle--each award is $1 million' if SS.show_explanation else ''}"), 
+else:
+    slider_col = col2
+slider_col.slider((f"Budget: {'In millions per funding cycle--each award is $1 million' if SS.show_explanation else ''}"), 
             min_value=2, max_value=10, step=2, value=SS.budget, 
             on_change=generic_handler,
             args=('budget slider', 'budget'),
             key='budget slider')
 
-hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
-
 if SS.show_explanation:
-    exp = st.expander("Show one round of funding")
-    (col1, col2) = exp.columns(2)
-    col1.write("All Projects")
-    top_n_df = SS.df.loc[:, SS.df.columns.isin(['algo', 'id', 'skill', 'draw',
-                                             'score', 'total funds'])]
-    col1.dataframe(top_n_df)
-    col2.write("Winning Projects")
-    col2.dataframe(top_n_df[top_n_df['total funds'] == 1])
+    if col1.button("Run Top N"):
+        SS.num_sims = 1
+        run_sim_as_configured()
+        st.dataframe(SS.df)
+    if SS.df is None:
+        st.stop()
+    
+    if col1.button(f"Show round {SS.current_round}"):
+        col2.write("All Projects")
+        top_n_df = SS.df[(SS.df['algo'] == 'Top N') &
+                        (SS.df['round'] == SS.current_round)]
+        
+        top_n_df = top_n_df.loc[:, 
+                            top_n_df.columns.isin(['algo',
+                                     'id', 'skill', 'draw writeup', 'draw review',
+                                    'score', 'total funds'])]
+        
+        col2.dataframe(top_n_df.style.format(subset=['draw writeup', 
+                                                    'draw review',
+                                                'skill', 
+                                                'score'], formatter='{:.2f}'))
+        plot = render3(SS.df[(SS.df['algo'] == 'Top N') &
+                        (SS.df['round'] <= SS.current_round)],
+                        'total funds', 
+                        True, 
+                        False, 
+                        False)
+        col1.pyplot(p9.ggplot.draw(plot))
+        SS.current_round = 1 if \
+            SS.current_round % SS.num_funding_rounds == 0 else\
+                 SS.current_round + 1
+
+
+                    
+
 
 #exp = st.expander("Applying Top N algorithm for multiple rounds of funding")
+
+st.stop()
 
 top_n_doc = """
 ## Cumulative Effects of Many Rounds of Funding: Empire building
@@ -617,6 +692,8 @@ if SS.show_explanation:
     exp.markdown("""
 Proposals tend to either be OMG this should be funded with a long tail of less extraordnary efforts. Program managers, admission committees and other selection processes do feel that judgement has an important and predictively useful role which is the driving force behind the Top N algorithm. So the hybrid algorithm acknoledges that but changes that to Top N/2 where half the funding is done that way, the remainder is Random N. The ratio could be adjusted but trying to keep it simple.
 """)
+
+hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
 
 col3.slider(f"Reputation increase: {'How much increase in reputation per funding award which is added to project score.' if SS.show_explanation else ''}", 
                 min_value=0.0, 
@@ -682,30 +759,6 @@ col1.button("Rerun as configured", on_click=run_n_wrapper)
 #    col1.info("Only last simulation results graphed since the number of simulations is > 1")
 
 
-def plot_details(out):
-    options = ['total funds', 'draw', 'reputation', 'score', 'skill']
-    plot = render3(SS.df, SS.y_dimension, SS.show_top_n, SS.show_rand_n, 
-                    SS.show_hybrid)
-    if plot is not None:
-        out.pyplot(p9.ggplot.draw(plot))
-    out.checkbox("Top N", value=SS.show_top_n, 
-                on_change=generic_handler,
-                args= ('show_top_n_cb', 'show_top_n'),
-                key='show_top_n_cb')
-    out.checkbox("Random N", value=SS.show_rand_n,
-                on_change=generic_handler,
-                args= ('show_rand_n_cb', 'show_rand_n'),
-                key='show_rand_n_cb')
-    out.checkbox("Hybrid", value=SS.show_hybrid, 
-                on_change=generic_handler,
-                args= ('show_hybrid_cb', 'show_hybrid'),
-                key='show_hybrid_cb')
-    y_dimension = out.selectbox("Y dimension",
-                options=options,
-                index=options.index(SS.y_dimension),
-                on_change=generic_handler,
-                args=('select_y_dim', 'y_dimension'),
-                key='select_y_dim')
 
 def plot_results(col, i):
     y_units_key_i = f'y_units_{i}'
