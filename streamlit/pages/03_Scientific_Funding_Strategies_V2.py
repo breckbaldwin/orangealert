@@ -1,4 +1,5 @@
 from collections import defaultdict
+from gzip import WRITE
 from numpy import generic
 import streamlit as st
 #st.set_page_config(layout="wide")
@@ -11,12 +12,23 @@ import re
 from mizani.formatters import percent_format
 from numpy.random import default_rng
 import random
+import util
 
 RNG = default_rng()
 sys.path.append("pages/")
 
-import util
-
+ID = util.ID
+REVIEW_DRAW = util.REVIEW_DRAW
+WRITEUP_DRAW = util.WRITEUP_DRAW
+SKILL = util.SKILL
+REPUTATION = util.REPUTATION
+SCORE = util.SCORE
+FUNDS = util.FUNDS
+Y_OFFSET = util.Y_OFFSET
+ROUND_NUM = util.ROUND_NUM
+WON = util.WON
+REASON = util.REASON
+ALGORITHM = util.ALGORITHM
 SS = st.session_state
 
 pd.set_option('display.max_colwidth', None)
@@ -36,16 +48,17 @@ def reset():
     SS.num_projects = 10
     SS.skills = [0.0, 1.0, 2.0, 3.0, 4.0]
     SS.skills.reverse()
+    SS.proj_skill_values = [2.0] * SS.num_projects
     SS.names = "abcdefghijklmnopqrstuvwxyz".upper()
-    SS.names = ['Amit', 'Beth', 'Chris', 'Drew', 'Enid', 'Fred', 'Gina', 'Hank',
-                'Ivor', 'Jude']
+    SS.names = ['Amit', 'Beth', 'Chris', 'Drew', 'Enid', 
+                'Fred', 'Gina', 'Hank', 'Ivor', 'Jude']
     SS.proj_skill_values = [1.0] * SS.num_projects
     SS.show_explanation = True
     SS.Notes = 'reset()'
     SS.show_top_n = True,
     SS.show_rand_n = True,
     SS.show_hybrid = False
-    SS.y_dimension = 'total funds'
+    SS.y_dimension = FUNDS
     SS.sel_run_1 = 'latest'
     SS.sel_run_2 = 'latest'
     SS.y_units_1 = 'percent'
@@ -79,13 +92,13 @@ def run_simulation(proj_data_2,
                     minimum_threshold):
     top_n = copy.deepcopy(proj_data_2)
     for proj in top_n:
-        proj['algo'] = 'Top N'
+        proj[ALGORITHM] = 'Top N'
     rand_n = copy.deepcopy(proj_data_2)
     for proj in rand_n:
-        proj['algo'] = 'Random N'
+        proj[ALGORITHM] = 'Random N'
     hybrid = copy.deepcopy(proj_data_2)
     for proj in hybrid:
-        proj['algo'] = 'Hybrid'
+        proj[ALGORITHM] = 'Hybrid'
     results = []
     results.extend(top_n)
     results.extend(rand_n)
@@ -94,6 +107,8 @@ def run_simulation(proj_data_2,
         top_n = copy.deepcopy(top_n)
         rand_n = copy.deepcopy(rand_n)
         hybrid = copy.deepcopy(hybrid)
+        for proj in top_n + rand_n + hybrid:
+            proj[WON] = False 
         util.add_score([top_n, rand_n, hybrid], 
                         sd_writeup,
                         sd_review,
@@ -152,7 +167,8 @@ def run_n_simulations(num_sims, proj_skill_values, names,
                                 budget,
                                 hybrid_top_n_budget,
                                 minimum_threshold)
-        accum_final_counts(SS.accum_df, SS.df, algo_names, num_funding_rounds)
+        accum_final_counts(SS.accum_df, SS.df, algo_names, 
+                            num_funding_rounds)
 #    accum_gt_counts(num_funding_rounds, algo_names, SS.accum_df)
     SS.accum_df['percent'] = SS.accum_df['count']/( num_projects * num_sims)
     #SS.accum_df['>= percent'] = SS.accum_df['>= count']/total_funds
@@ -200,25 +216,32 @@ def run_n_wrapper():
     run_sim_as_configured()
 
 
-def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
+def render3(df, column_to_show, show_top_n, show_random_n,
+            show_hybrid):
     if not (show_top_n or show_random_n or show_hybrid):
         st.info("select a dataset to view")
         return None
     offset_scale =  (max(df[column_to_show]) - min(df[column_to_show])) / 100
     offset_scale = max(offset_scale, .01)
-    df['y'] = df[column_to_show] + df['y_offset'] * offset_scale
+    df['y'] = df[column_to_show] + df[Y_OFFSET] * offset_scale
 
-    plot = (p9.ggplot(mapping=p9.aes(x='round', y='y', group = 'id')))
+    plot = (p9.ggplot(mapping=p9.aes(x=ROUND_NUM, y='y', group = ID)))
     if show_top_n:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Top N'],
-                                    mapping=p9.aes(color='id'), size=.7)
+        plot = (plot +
+                p9.geom_line(data=df[df[ALGORITHM] == 'Top N'],
+                mapping=p9.aes(color=ID), size=.7)
+        )
     if show_random_n:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Random N'],   
-                                    mapping=p9.aes(color='id'), size=.7, 
+        plot = plot + p9.geom_line(data=df[df[ALGORITHM] \
+                                    == 'Random N'],   
+                                    mapping=p9.aes(color=ID), 
+                                    size=.7, 
                                     linetype='dotted')
     if show_hybrid:
-        plot = plot + p9.geom_line(data=df[df['algo'] == 'Hybrid'], 
-                                    mapping=p9.aes(color='id'), size=.7, 
+        plot = plot + p9.geom_line(data=df[df[ALGORITHM] \
+                                    == 'Hybrid'], 
+                                    mapping=p9.aes(color=ID), 
+                                    size=.7, 
                                     linetype='dashdot')
     if (column_to_show == 'skill' 
         and max(df[column_to_show]) == min(df[column_to_show])):
@@ -228,17 +251,19 @@ def render3(df, column_to_show, show_top_n, show_random_n, show_hybrid):
             limits=[single_y - 0.5, single_y + .5])
 
     plot = (plot + p9.xlim([0,SS.num_funding_rounds]) 
-            + p9.ylim([0,SS.num_funding_rounds]))
+            + p9.ylim([0,SS.num_funding_rounds + .5]))
     
-    plot = plot + p9.labels.ylab(f"Y projects jittered by {offset_scale:.2f}")
+    plot = (plot + 
+    p9.labels.ylab(f"Y projects jittered by {offset_scale:.2f}")
+    )
     #plot = plot + p9.theme_xkcd()
     return plot
 
 def accum_final_counts(sim_df, df, algo_names, num_funding_rounds):
     for algo in algo_names:
-        last_round_algo_df = df[(df['algo'] == algo) & 
-                            (df['round'] == num_funding_rounds)]
-        for total_funds in last_round_algo_df['total funds']:
+        last_round_algo_df = df[(df[ALGORITHM] == algo) & 
+                            (df[ROUND_NUM] == num_funding_rounds)]
+        for total_funds in last_round_algo_df[FUNDS]:
             total_funds_int = int(total_funds)
             sim_df.loc[(sim_df['algo'] == algo) & 
                         (sim_df['funding bin'] == total_funds_int), 
@@ -248,9 +273,9 @@ def accum_gt_counts(num_funding_rounds, algo_names, sim_df):
     for algo in algo_names:
         for value in range(1, num_funding_rounds + 1):
                 gt_count = \
-                    sum(sim_df[(sim_df['algo'] == algo) &
+                    sum(sim_df[(sim_df[ALGORITHM] == algo) &
                             (sim_df['funding bin'] >= value)]['count'])
-                sim_df.loc[(sim_df['algo'] == algo) &
+                sim_df.loc[(sim_df[ALGORITHM] == algo) &
                             (sim_df['funding bin'] == value), 
                             '>= count'] = gt_count
 
@@ -294,25 +319,43 @@ You'll be simulating wrecked careers as well as meteoric ascensions to greatness
 
 """)
 
+def reset_current_simulation(out):
+    out.info("Resetting current run, previous runs are preserved")
+    SS.df = None
+    SS.currently_being_scored = 0
+    SS.proj_data = util.init(SS.proj_skill_values, SS.names)
+
+def apply_skills_rb():
+    skills = None
+    if SS.skills_rb == "Bell Curve":
+        skills = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 
+                    3.0, 3.0, 4.0]
+    if SS.skills_rb == "God's Gift is Amongst Us":
+        skills = [4.0] + [1.0] * 9
+    if SS.skills_rb == "A Mother's Love":
+        skills = [2.0] * 10
+    for i, skill in enumerate(skills):
+        SS.proj_skill_values[i] = skill
+    
 exp = st.expander("Set skills for projects")
-exp.radio("Suggested Skill Collections", 
+exp.radio("Suggested Skill Templates--modifiable", 
     options=["Bell Curve", "God's Gift is Amongst Us", "A Mother's Love"],
     index=2,
+    on_change=apply_skills_rb,
+    key="skills_rb",
     horizontal=True)
-
-SS.proj_skill_values = [0.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0]
-
-SS.proj_skill_values = [2.0] * SS.num_projects
 
 cols = exp.columns(SS.num_projects)
 for i in range(SS.num_projects):
-    SS.proj_skill_values[i] = \
-        cols[i].radio(f"{SS.names[i]}", 
-                        SS.skills, 
-                        index=SS.skills.index(SS.proj_skill_values[i]),
-                        key=i, 
-                        horizontal=False)
-
+    cols[i].radio(f"{SS.names[i]}",
+                    SS.skills, 
+                    index=SS.skills.index(SS.proj_skill_values[i]),
+                    key=f"skill{i}",
+                    horizontal=False)
+if exp.button("Apply changes, resets current run"):
+    for i in range(10):
+        SS.proj_skill_values[i] = SS[f"skill{i}"]
+    reset_current_simulation(exp)
 
 #top_n_df = pd.DataFrame(top_n)
 if SS.show_explanation:
@@ -328,65 +371,27 @@ You get to control where 68 percent of the darts will land with the two sliders 
 
 Below are controls and a button to throw darts one at a time. You will see the draw and the math to compute the score which is just skill + writeup draw + revew draw + reputation (0.00 for now) = score. Review draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0. As often seen with humans, the reason is a complete fabrication.""")
 
-
-fii = """Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
-
-As alluded to above, only god or the simulation runner knows the true skill behind a project represented in a value between 0.0 and 4.0. But mere humans will be attempting to assign a score to each project's funding application.
-
-The score is the sum of:
-
-- Draw: The proposal writer attempts to convey their skill and the reviewer attempts to assess the skill behind the proposal. Both of these processes are imperfectly accurate. The writer may be inspired and write a better proposal than their actual skill. The other end of the continium is that they have a bad day and write a worse proposal than their actual skill or something in between. The reader has the same issues, in a good mood with a strong cup of coffee, they may assess the proposal at a higher level of skill. Weak coffee and a gloomy day may carry over to a lower assessment of skill than actual.
-
-## Smart humans who figured out they are stupid
-
-This score business is gonna be noisy. For example the smartest people at the world's smartest artificial intelligence conference (Neurips) can't agree on the quality of submitted research papers. Respect to the smart people who worked hard to figure out they were stupid--twice. To be fair the entire task is roughly impossible, but there are places of agreement--more on that later. 
-
-Above you had the option to use the bell-curve to assign skill as god which in this simulation is the truth and a statement about how true skill varies among applicants. But now we are asking a mere human to **play** god by assigning a score to a research proposal that will be used to make a decision. If we had 100 reviewers we could assume the god assigned skill to be recovered most often of any score. The next most common scores would be plus/minus one grade (1.0), even less common would be those scores plus/minus 2.0 and so on. 
-
-But just like whether Y,GR chose a bell curve for true skill, the bell curve, aka Normal or Gaussian distribution, is an assumption. But as an assumption it covers a broad range of sins and problems that I'll decriment my bullet-point budget to articulate:
-
-- The key idea behind the bell curve as an error model for measurement is that errors tend to cancel each other out but only on average. So Dr. Faultenroy's utter ignorance of Bayesian statistics is canceled out by the fact that the title had a good pun. 
-- Because averages don't always end up at 50\% for two choices you get skewed heads/tails lots of times.
-- But most of the time you get 50/50, next most 49/51, 51/49, next most 48/52 and so on.
-- In violation of the 3 bullet point rule: There are other error models, bell curve is just very common and robust. 
-
-<img bell curve for coins>
-
-That's enough for now, go take a statistics course if you want to know more and for the love of god make sure it is a Bayesian one.
-
-So how do we manage our stupid human reviewer simulation? We assume they are going to be wrong a bunch but on average they will hit their numbers or be pretty close. We "virtually" throw a dart at the dark area of the above bell curve and if we hit the dark area we return the number on the x axis. If you think about it if we throw a million darts, the most common value will be the god decided skill. Pretty neat. But remember Y,GR, if you chose a bell curve for skills it has nothing to do with the measurements above, you could have been a unitarian. 
-
-The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
-"""
-
-
 def plot_draws(author_draws, reviewer_draws, proj_names):
-    plot = p9.ggplot(data=pd.DataFrame({'author_draw': author_draws,
-                                        'reviewer_draw': reviewer_draws,
-                                        'id': proj_names}),
-                    mapping=p9.aes(x='author_draws', y='reviewer_draws',
-                                    label='id'))
+    x_dim = "Writeup's Reflection of Author Skill"
+    y_dim = "Reviewer's Accuracy of Writeup Evaluation"
+    plot = p9.ggplot(data=pd.DataFrame(
+                    {x_dim:  author_draws,
+                     y_dim: reviewer_draws,
+                    'id': proj_names}),
+                    mapping=p9.aes(x=x_dim, y=y_dim,
+                    label='id'))
     plot = plot + p9.geom_point()
     plot = plot + \
         p9.geom_text(nudge_x=.1, nudge_y=.1)
-    
     plot = plot + \
         p9.geom_point(data=pd.DataFrame({'x':[0.0],
                                            'y':[0.0]}),
                         mapping=p9.aes(x='x', y='y'),
                         fill='red')
-#    plot = plot + p9.stat_ellipse(geom='polygon', level= 0.95,
-#                                    type='norm',
-#                                    alpha=.2,
-#                                    fill='blue')
     plot = plot + p9.stat_ellipse(geom='polygon', level= 0.68,
                                     type='t',
                                     alpha=.2,
                                     fill='red')
-    #plot = plot + p9.stat_ellipse(geom='polygon', level= 0.1,
-    #                                type='t',
-    #                                alpha=.2,
-    #                                fill='green')
     plot = (plot 
              + p9.scales.ylim([min([-1.0] + author_draws) - .1,
                                max([1.0] + author_draws) + .1]) 
@@ -402,9 +407,7 @@ if SS.show_explanation:
 
 def std_dev_handler(widget_name, variable):
     generic_handler(widget_name, variable)
-    SS.currently_being_scored = 0
-    SS.proj_data = util.init(SS.proj_skill_values, SS.names)
-    col1.info("Resetting previous scores")
+    reset_current_simulation()
 
 col1.slider(f"Standard deviation writeup: {'68% of project writeup fall within specified +/- range in conveying skill' if SS.show_explanation else ''} ",   
             min_value=0.0, max_value=1.0, step=0.25,
@@ -436,9 +439,11 @@ def add_score():
     draw_project_presentation = RNG.normal(0, SS.sd_writeup_reflection_of_skill)
     draw_reviewer_accuracy = RNG.normal(0, SS.sd_reviewer_accuracy)
     proj_datum = SS.proj_data[SS.currently_being_scored]
-    proj_datum['draw writeup'] = draw_project_presentation
-    proj_datum['draw review'] = draw_reviewer_accuracy
-    proj_datum['score'] = (proj_datum['skill'] 
+    proj_datum[SKILL] =\
+         SS.proj_skill_values[SS.currently_being_scored]
+    proj_datum[WRITEUP_DRAW] = draw_project_presentation
+    proj_datum[REVIEW_DRAW] = draw_reviewer_accuracy
+    proj_datum[SCORE] = (proj_datum[SKILL] 
                             + draw_project_presentation 
                             + draw_reviewer_accuracy)
     reason = ''
@@ -446,37 +451,36 @@ def add_score():
         reason = random.sample(reasons_positive_score, 1)
     else:
         reason = random.sample(reasons_negative_score, 1)
-    proj_datum['reason why review is skewed'] = reason
+    proj_datum[REASON] = reason
     SS.currently_being_scored = \
             (SS.currently_being_scored + 1) % SS.num_projects
 
 def render_scoring_df(df, out):
-    if 'draw writeup' not in df:
+    if WRITEUP_DRAW not in df:
         out.write("Click on button")
         return
     disp_df = pd.DataFrame()
-    disp_df['skill'] = df['skill']
-    disp_df['writeup'] = df['draw writeup']
-    disp_df['review'] = df['draw review']
-    disp_df['rep'] = df['reputation']
-    disp_df['score'] = df['score']
-    disp_df['reason for skew'] = df['reason why review is skewed']
-    disp_df['Proj Id'] = df['id']
-    display_cols = ['Proj Id', 'skill', 
-                                'writeup', 
-                                'review',
-                                'score', 
-                                'rep',
-                                #'reason for skew'
-                                ]
-
+    disp_df = df[[SKILL, WRITEUP_DRAW, REVIEW_DRAW, REPUTATION, 
+                  SCORE, REASON, ID]]
+    # disp_df[WRITEUP_DRAW] = df[WRITEUP_DRAW]
+    # disp_df['review'] = df['review']
+    # disp_df['reputation'] = df['reputation']
+    # disp_df['score'] = df['score']
+    # disp_df['reason for skew'] = df['reason why review is skewed']
+    # disp_df['Proj Id'] = df['id']
+    display_cols = [ID, SKILL, WRITEUP_DRAW, REVIEW_DRAW,
+                    SCORE, REPUTATION]
     disp_df = disp_df.loc[:, 
               disp_df.columns.isin(display_cols)]
     
 #    disp_df = pd.DataFrame(disp_df.iloc[-1])
-    out.dataframe(disp_df.style.format(subset=['writeup', 'review',
-                                                'skill', 'rep', 
-                                                'score'], formatter='{:.2f}'))
+    out.dataframe(disp_df.style.\
+            format(subset=[WRITEUP_DRAW, 
+                           REVIEW_DRAW,
+                           SKILL,
+                            REPUTATION,
+                            SCORE],
+                    formatter='{:.2f}'))
 
 if SS.show_explanation:
 #    col1.checkbox("Score Individually", 
@@ -488,20 +492,20 @@ if SS.show_explanation:
         if 'proj_data' not in SS:
             SS.proj_data = util.init(SS.proj_skill_values, SS.names)
         df = pd.DataFrame(SS.proj_data)
-        df = df[df['draw writeup'].notnull()]
+        df = df[df[WRITEUP_DRAW].notnull()]
         if len(df) < SS.num_projects:
             col1.button(f"Draw writeup and review variation for {SS.names[SS.currently_being_scored]}'s project",
                 on_click=add_score,
                 key=f"draw_button")
         if len(df) > 0:
             try:
-                plot = plot_draws(list(df['draw writeup']), 
-                              list(df['draw review']),
-                              list(df['id']))
+                plot = plot_draws(list(df[WRITEUP_DRAW]), 
+                              list(df[REVIEW_DRAW]),
+                              list(df[ID]))
                 col2_wide.pyplot(p9.ggplot.draw(plot))
             except p9.exceptions.PlotnineWarning as e:
                 st.info(e)
-            col1.write(f"Reason for reviewer draw: {df['reason why review is skewed'].iloc[-1][0]}")
+            col1.write(f"Reason for reviewer draw: {df[REASON].iloc[-1][0]}")
             render_scoring_df(df, col2_wide)
             st.markdown(f"""
 Each of the algorithms is briefly explained below, the algorithms share the same draws across each round of funding but the cumulative effects will differ as reflected in the reputation value and accumulated funding. 
@@ -556,7 +560,8 @@ if 'df' not in SS:
 #                           SS.num_projects)
 
 def plot_details(out):
-    options = ['total funds', 'draw', 'reputation', 'score', 'skill']
+    options = [FUNDS, WRITEUP_DRAW, REVIEW_DRAW,  
+                REPUTATION, SCORE, SKILL]
     plot = render3(SS.df, SS.y_dimension, SS.show_top_n, 
                     SS.show_rand_n, SS.show_hybrid)
     if plot is not None:
@@ -689,35 +694,36 @@ if SS.show_explanation:
                 options=['Top N', 'Random N', 'Hybrid'], 
                 horizontal=True,
                 key="algo_cb")
-    top_n_df = SS.df[(SS.df['algo'] == SS.algo_cb) &
-                     (SS.df['round'] == SS.current_round)]
+    sub_df = SS.df[(SS.df[ALGORITHM] == SS.algo_cb) &
+                     (SS.df[ROUND_NUM] == SS.current_round)]
         
-    top_n_df = top_n_df.loc[:, 
-                                top_n_df.columns.isin([
-                                    'id', 'reputation', 
-                                    'skill',
-                                    'draw writeup', 
-                                    'draw review',
-                                    'score', 'total funds'])]
+    sub_df = sub_df.loc[:, 
+                                sub_df.columns.isin([
+                                    ID, REPUTATION, 
+                                    SKILL,
+                                    WRITEUP_DRAW, 
+                                    REVIEW_DRAW,
+                                    WON,
+                                    SCORE, FUNDS])]
         
-    col2.dataframe(top_n_df\
-        .style.format(subset=['draw writeup', 
-                              'draw review',
-                              'reputation',
-                              'skill', 
-                              'score'], formatter='{:.2f}'))
-    plot = render3(SS.df[(SS.df['algo'] == SS.algo_cb) &
-                        (SS.df['round'] <= SS.current_round)],
-                        'total funds', 
+    col2.dataframe(sub_df\
+        .style.format(subset=[WRITEUP_DRAW, 
+                              REVIEW_DRAW,
+                              REPUTATION,
+                              SKILL, 
+                              SCORE], formatter='{:.2f}')\
+        .format(subset=[FUNDS], 
+                        formatter='${:.0f} M'))
+
+    col1.write(SS.algo_cb)
+    plot = render3(SS.df[(SS.df[ALGORITHM] == SS.algo_cb) &
+                        (SS.df[ROUND_NUM] <= SS.current_round)],
+                        FUNDS, 
                         SS.algo_cb == 'Top N', 
                         SS.algo_cb == 'Random N', 
                         SS.algo_cb == 'Hybrid')
-    col1.pyplot(p9.ggplot.draw(plot))
-    col1.write("Winners")
-    SS.df[SS.df['total funds']]
-    #col1.dataframe(display_df[display_df['total funds'] == 1.0])
-    col1.dataframe()
 
+    col1.pyplot(p9.ggplot.draw(plot))
 
 #exp = st.expander("Applying Top N algorithm for multiple rounds of funding")
 
@@ -734,28 +740,21 @@ if SS.show_explanation:
 #             args=('threshold slider', 'minimum_threshold'),
 #             key='threshold slider')
 
-
-
-
-
 if SS.show_explanation:
     exp = st.expander("Show one round of funding")
     (col1, col2) = exp.columns(2)
     col1.write("All Projects")
-    rand_n_df = SS.df[SS.df['algo'] == 'Random N']
-    display_df = rand_n_df.loc[:, SS.df.columns.isin(['algo', 'id', 'skill', 'draw',
-                                             'score', 'total funds'])]
+    rand_n_df = SS.df[SS.df[ALGORITHM] == 'Random N']
+    display_df = rand_n_df.loc[:, SS.df.columns.\
+        isin([ALGORITHM, ID, SKILL, WRITEUP_DRAW, REVIEW_DRAW,
+            SCORE, FUNDS])]
     col1.dataframe(display_df)
-    col2.write("Winning Projects")
-    col2.dataframe(display_df[display_df['total funds'] == 1.0])
-
-
 
 hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
 
 if SS.show_explanation:
     exp1 = st.expander("Details")
-    exp1.markdown(top_n_doc)
+    #exp1.markdown(top_n_doc)
 
 def apply_options():
     params = SS.interesting_params.split(', ')
@@ -805,9 +804,11 @@ col3.radio("Run N simulations", options=options,
         on_change=run_n_wrapper, 
         key='simulation_radio_btn',
         horizontal=True)
-col1.button("Rerun as configured", on_click=run_n_wrapper)
+col1.button("(Re)run as configured", on_click=run_n_wrapper)
 #if SS.num_sims > 1:
 #    col1.info("Only last simulation results graphed since the number of simulations is > 1")
+if SS.df is None:
+    st.stop()
 
 num_plots = col2.selectbox("Number of plots", options=[1,2])
 if show_detail_graph:
@@ -864,3 +865,32 @@ Based on paper at: https://breckbaldwin.github.io/S3rd/presentations/DOE2021/Fun
 - If a candidate is funded then their reputation increases .1 and the resource count increases by 1. Resources/reputation can only go up, merit stays the same. """
 
 
+fii = """Now we have some place to start before we pitch off into the dreaded algorithims. Just a bit more to do before the **judging** begins.
+
+As alluded to above, only god or the simulation runner knows the true skill behind a project represented in a value between 0.0 and 4.0. But mere humans will be attempting to assign a score to each project's funding application.
+
+The score is the sum of:
+
+- Draw: The proposal writer attempts to convey their skill and the reviewer attempts to assess the skill behind the proposal. Both of these processes are imperfectly accurate. The writer may be inspired and write a better proposal than their actual skill. The other end of the continium is that they have a bad day and write a worse proposal than their actual skill or something in between. The reader has the same issues, in a good mood with a strong cup of coffee, they may assess the proposal at a higher level of skill. Weak coffee and a gloomy day may carry over to a lower assessment of skill than actual.
+
+## Smart humans who figured out they are stupid
+
+This score business is gonna be noisy. For example the smartest people at the world's smartest artificial intelligence conference (Neurips) can't agree on the quality of submitted research papers. Respect to the smart people who worked hard to figure out they were stupid--twice. To be fair the entire task is roughly impossible, but there are places of agreement--more on that later. 
+
+Above you had the option to use the bell-curve to assign skill as god which in this simulation is the truth and a statement about how true skill varies among applicants. But now we are asking a mere human to **play** god by assigning a score to a research proposal that will be used to make a decision. If we had 100 reviewers we could assume the god assigned skill to be recovered most often of any score. The next most common scores would be plus/minus one grade (1.0), even less common would be those scores plus/minus 2.0 and so on. 
+
+But just like whether Y,GR chose a bell curve for true skill, the bell curve, aka Normal or Gaussian distribution, is an assumption. But as an assumption it covers a broad range of sins and problems that I'll decriment my bullet-point budget to articulate:
+
+- The key idea behind the bell curve as an error model for measurement is that errors tend to cancel each other out but only on average. So Dr. Faultenroy's utter ignorance of Bayesian statistics is canceled out by the fact that the title had a good pun. 
+- Because averages don't always end up at 50\% for two choices you get skewed heads/tails lots of times.
+- But most of the time you get 50/50, next most 49/51, 51/49, next most 48/52 and so on.
+- In violation of the 3 bullet point rule: There are other error models, bell curve is just very common and robust. 
+
+<img bell curve for coins>
+
+That's enough for now, go take a statistics course if you want to know more and for the love of god make sure it is a Bayesian one.
+
+So how do we manage our stupid human reviewer simulation? We assume they are going to be wrong a bunch but on average they will hit their numbers or be pretty close. We "virtually" throw a dart at the dark area of the above bell curve and if we hit the dark area we return the number on the x axis. If you think about it if we throw a million darts, the most common value will be the god decided skill. Pretty neat. But remember Y,GR, if you chose a bell curve for skills it has nothing to do with the measurements above, you could have been a unitarian. 
+
+The approach to scoring is very simple. We draw, 'throw a dart', at the bell curve that is centered at 0, take the value, positive or negative, and add it to the skill. You can see the result in the below table.
+"""
