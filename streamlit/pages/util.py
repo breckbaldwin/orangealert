@@ -13,7 +13,7 @@ def init(proj_start_values, names):
     jitter = -1
     for i in reversed(range(len(proj_start_values))): #keeps chart legend order
         jitter += 1
-        top_n[i] = {'id': f"Proj {names[i]}", 
+        top_n[i] = {'id': names[i], 
                     'draw review': None,
                     'draw writeup': None,
                     'skill': proj_start_values[i], 
@@ -23,6 +23,7 @@ def init(proj_start_values, names):
                     'cumulative benefit': 0,
                     'y_offset': jitter,
                     'round': 0,
+                    'round won': False,
                     'algo': None,
                     'reason why review is skewed': None}
     return (top_n)
@@ -70,6 +71,7 @@ def distribute_awards(winners, funds, reputation):
     for winner in winners:
         winner['reputation'] +=  reputation
         winner['total funds'] += funds
+        winner['round won'] = True
 
 def run3(top_n, rand_n, hybrid, num_funding_rounds, num_projects, budget,
             reputation_increase_from_funding, funding_threshold):
