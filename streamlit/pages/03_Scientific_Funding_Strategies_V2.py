@@ -12,10 +12,11 @@ import re
 from mizani.formatters import percent_format
 from numpy.random import default_rng
 import random
+sys.path.append("pages/")
 import util
 
 RNG = default_rng()
-sys.path.append("pages/")
+
 
 ID = util.ID
 REVIEW_DRAW = util.REVIEW_DRAW
@@ -36,12 +37,12 @@ pd.set_option('display.max_colwidth', None)
 def reset():
     SS.df = None
     SS.accum_df = None
-    SS.sd_writeup_reflection_of_skill = .5
+    SS.sd_writeup_reflection_of_skill = .25
     SS.budget = 2
     SS.hybrid_top_n_budget = SS.budget//2
     SS.funding_amount_in_millions = 1.0
     SS.num_funding_rounds = 5
-    SS.reputation_increase_per_funding_round = .5
+    SS.reputation_increase_per_funding_round = .75
     SS.minimum_threshold = 1.0
     SS.num_sims = 1
     SS.algo_names = ['Top N', 'Random N', 'Hybrid']
@@ -52,7 +53,6 @@ def reset():
     SS.names = "abcdefghijklmnopqrstuvwxyz".upper()
     SS.names = ['Amit', 'Beth', 'Chris', 'Drew', 'Enid', 
                 'Fred', 'Gina', 'Hank', 'Ivor', 'Jude']
-    SS.proj_skill_values = [1.0] * SS.num_projects
     SS.show_explanation = True
     SS.Notes = 'reset()'
     SS.show_top_n = True,
@@ -65,9 +65,10 @@ def reset():
     SS.y_units_2 = 'percent'
     SS.currently_being_scored = 0
     SS.score_individually = True
-    SS.sd_writeup_reflection_of_skill = .5
-    SS.sd_reviewer_accuracy = .5
+    SS.sd_writeup_reflection_of_skill = .25
+    SS.sd_reviewer_accuracy = .25
     SS.current_round = 1
+    SS.algo_for_spend = 'Top N'
 
 session_config_values = ['Notes', 'sd_writeup_reflection_of_skill', 
 'sd_reviewer_accuracy', 'budget', 
@@ -294,13 +295,16 @@ if SS.show_explanation:
     exp.markdown("""
 ## Welcome to the simulation
 
-Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort: The 2023 incoming class at Harvard, presentation at an academic conference and my focus--being among the awardees of a research grant. This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html.
+Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort: The 2023 incoming class at Harvard, presentation at an academic conference and my focus--being among the awardees of a research grant. The simulation allows you to explore the cumulative effects of this process across 10 individuals over 5 cycles. 
 
-TL;DR The simulation covers 
+This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
+
+TL;DR The simulation covers three algorithms for 5 iterations across 10 people for research funding. The algorithms are: 
 
 1. A _Top N_ approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy.
 2. A _Random N_ approach that awards N slots randomly to candidates that pass a minumum score threshold.
 3. A _Hybrid_ approach that blends the two. 
+
 
 ## Scoring candidates
 
@@ -313,10 +317,9 @@ I'll use research funding as the use-case for the simulation with the following 
 
 You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time, but skills have to be assigned first. There are three options plus just setting scores as your omnipotence decrees:
 
-1. Bell Curve: Mostly C's, some B's and D's and an outlier A and F.
+1. Bell Curve: Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0).
 2. God's Gift: One genius, A, in a collection of mediocrity, D's.
 3. A Mother's Love: All researchers have the same mother who raised them equally skilled but mother is a realist and knows they are pretty average (C's).
-
 """)
 
 def reset_current_simulation(out):
@@ -361,13 +364,18 @@ if exp.button("Apply changes, resets current run"):
 if SS.show_explanation:
     exp = st.expander("Fickle Human Simulation", expanded=False)
     exp.markdown("""
-While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0:
+While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0 on a [Cartesian plot](https://en.wikipedia.org/wiki/Cartesian_coordinate_system):
 
 - Horizontal distance from the bull's eye is how accurately the proposal refelects the actual skill of the researcher.
 
 - Vertical distance from the bull's eye is the reviewer's accuracy reviewing said proposal. 
 
-You get to control where 68 percent of the darts will land with the two sliders below, e.g., where one (1) standard deviation of random draws, aka dart throws, will land. With just 10 throws the results will not be perfectly scattered but an approximate 68\% area of the actual throws will be drawn when there are enough data points.
+You get to control where 68 percent of the darts will land, e.g., where one (1) [standard deviation](https://en.wikipedia.org/wiki/Standard_deviation) of random draws, aka dart throws, will land. Why the controls? 
+
+- If you think the writeup/proposal is always a perfect expression of the author's skill the set the standard deviation to 0.0. If you think writeups vary a lot in reflecting underlying skill then pick how much--there are only three remaining options: 0.25, 0.5, 0.75 and 1.0.  
+- Likewise, if you think reviewers have perfect recognition of assessing the skill in a writeup, then go with 0.0. If not, then how accurate are they? 
+
+With just 10 throws the results will not be perfectly scattered but an approximate 68\% area of the actual throws will be drawn when there are enough data points.
 
 Below are controls and a button to throw darts one at a time. You will see the draw and the math to compute the score which is just skill + writeup draw + revew draw + reputation (0.00 for now) = score. Review draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0. As often seen with humans, the reason is a complete fabrication.""")
 
@@ -403,17 +411,18 @@ def plot_draws(author_draws, reviewer_draws, proj_names):
 (col1, col2, col3) = st.columns(3)
 
 if SS.show_explanation:
-    (col1, col2_wide) = st.columns([1,2])
+    (col1, col2_wide) = exp.columns([1,2])
 
-def std_dev_handler(widget_name, variable):
+def std_dev_handler(widget_name, variable, out):
     generic_handler(widget_name, variable)
-    reset_current_simulation()
+    reset_current_simulation(out)
 
 col1.slider(f"Standard deviation writeup: {'68% of project writeup fall within specified +/- range in conveying skill' if SS.show_explanation else ''} ",   
             min_value=0.0, max_value=1.0, step=0.25,
             on_change=std_dev_handler,
             args=('sd_writeup_slider', 
-                  'sd_writeup_reflection_of_skill'), 
+                  'sd_writeup_reflection_of_skill',
+                  col1), 
             value=SS.sd_writeup_reflection_of_skill,
             key='sd_writeup_slider')
 
@@ -421,7 +430,8 @@ col1.slider(f"Standard deviation reviewer: {'68% of reviewer evaluations within 
             min_value=0.0, max_value=1.0, step=0.25,
             on_change=std_dev_handler,
             args=('sd_reviewer_slider',
-                   'sd_reviewer_accuracy'),
+                   'sd_reviewer_accuracy',
+                   col1),
             value=SS.sd_reviewer_accuracy,
             key='sd_reviewer_slider')
 
@@ -462,18 +472,11 @@ def render_scoring_df(df, out):
     disp_df = pd.DataFrame()
     disp_df = df[[SKILL, WRITEUP_DRAW, REVIEW_DRAW, REPUTATION, 
                   SCORE, REASON, ID]]
-    # disp_df[WRITEUP_DRAW] = df[WRITEUP_DRAW]
-    # disp_df['review'] = df['review']
-    # disp_df['reputation'] = df['reputation']
-    # disp_df['score'] = df['score']
-    # disp_df['reason for skew'] = df['reason why review is skewed']
-    # disp_df['Proj Id'] = df['id']
     display_cols = [ID, SKILL, WRITEUP_DRAW, REVIEW_DRAW,
                     SCORE, REPUTATION]
     disp_df = disp_df.loc[:, 
               disp_df.columns.isin(display_cols)]
     
-#    disp_df = pd.DataFrame(disp_df.iloc[-1])
     out.dataframe(disp_df.style.\
             format(subset=[WRITEUP_DRAW, 
                            REVIEW_DRAW,
@@ -483,11 +486,6 @@ def render_scoring_df(df, out):
                     formatter='{:.2f}'))
 
 if SS.show_explanation:
-#    col1.checkbox("Score Individually", 
-#                value=SS.score_individually,
-##                on_change=generic_handler,
-#                args=('score_indiv_cb', 'score_individually'),
-#                key='score_indiv_cb')
     if SS.score_individually:
         if 'proj_data' not in SS:
             SS.proj_data = util.init(SS.proj_skill_values, SS.names)
@@ -507,57 +505,22 @@ if SS.show_explanation:
                 st.info(e)
             col1.write(f"Reason for reviewer draw: {df[REASON].iloc[-1][0]}")
             render_scoring_df(df, col2_wide)
-            st.markdown(f"""
-Each of the algorithms is briefly explained below, the algorithms share the same draws across each round of funding but the cumulative effects will differ as reflected in the reputation value and accumulated funding. 
+    if len(df) < SS.num_projects:
+            exp.info(f"{SS.num_projects - len(df)} projects left to draw")
+            
+if SS.show_explanation: 
+    exp_rep = st.expander("Reputation")
+    exp_rep.markdown(f"""
+## Funding begets funding
 
 Reputation increments at {SS.reputation_increase_per_funding_round} for all the algorithms per award. This value can be changed below. Reputation is the mechanism that reflects the impact of having resources from previous funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or having a previously published conference paper on getting another conference paper accepted.
 
 All awards are \$1 million and the budget is exhausted each round. The budget can be raised to up to \$10 million but in even incremnts to allow for even split of the _Hybrid_ algorithm.
 """)
-        
-        if len(df) < SS.num_projects:
-            st.info(f"{SS.num_projects - len(df)} projects left to draw")
-            st.stop()
-
-        #df id factor=['id', 'skill', 'draw', 'score', 'reputation] value
-#        disp_long_df = pd.melt(disp_df, id_vars=['id'],
-#                value_vars=['id', 'skill', 'draw', 'score', 'reputation'])
-        #st.dataframe(disp_long_df)
-
-#        plot = (p9.ggplot(data=disp_long_df)
-#                + p9.geom_col(p9.aes(x='id', y='value', fill='variable')))
-#        st.pyplot(p9.ggplot.draw(plot))
-        
-#     exp.markdown("""
-# Each round of funding will draw a score and add it to the skill + reputation scores for the project. The reputation is 0 now, but with successful funding it will grow which reflects the benefit of a project being funded for subsequent rounds of funding. Reputation is how the rich get richer in this simulation which may or may not be a good idea--and it is central to the algorithms that we are experimenting with below.
-# """)
 
 if 'df' not in SS:
     SS.df = None
     SS.accum_df = None
-#one_run_button_description = "Draw scores for all projects"
-#if SS.show_explanation:
-#    if st.button(one_run_button_description):
-#        run_sim_as_configured()
-#        render_scoring_df(SS.df[(SS.df['algo'] == 'Top N') & 
-#r                                (SS.df['round'] == 1)], col2_wide)
-
-# if SS.df is None:
-#     if SS.show_explanation:
-#         st.info(f"Push {one_run_button_description} to evaluate/draw evaluations")
-#         st.stop()
-#     else:
-#         run_n_simulations(1, 
-#                           SS.proj_skill_values, 
-#                           SS.names,
-#                           SS.num_funding_rounds,
-#                           SS.standard_deviation, 
-#                           SS.reputation_increase_per_funding_round, 
-#                           SS.budget, 
-#                           SS.minimum_threshold,
-#                           SS.hybrid_top_n_budget,
-#                           SS.algo_names, 
-#                           SS.num_projects)
 
 def plot_details(out):
     options = [FUNDS, WRITEUP_DRAW, REVIEW_DRAW,  
@@ -625,7 +588,11 @@ if SS.show_explanation:
 ## Algorithmic meritocracy:
 
 The _Top N_ algorithm will take the available budget of \${SS.budget} million, and parcel out $1 million at a time starting at the top scoring project until the budget is spent. 
- 
+
+The incentive is to score in the top N which generally requires an excellent writeup (lots of work) and a good revew (some luck).
+
+Hard work and reviewers have to 'like the cut of your jib'. 
+
 If there are tied projects then pick randomly from them.
 """)
 
@@ -633,23 +600,31 @@ If there are tied projects then pick randomly from them.
     exp.markdown("""
 ## Work hard AND get lucky:
 
-The _Random N_ algorithm sets a minimum score for consideration in a lottery for the funds. Work hard, get a PhD, write a difficult proposal to score above a threshold. If more proposals are above threshold than the budget allows then select randomly. Brutal no? 
+The _Random N_ algorithm sets a minimum score for consideration in a lottery for the funds. There is no advantage to writing a proposal better than the threshold or having a greater reputation. 
 
-There may not be sufficient candidate proposals to qualify however, in that case the threshold is dropped by .1 until funds are exhausted iteratively with a fresh start on selection. 
+The incentive is to write an adequate proposal (work but less work than an 'excellent' proposal) to get above threshold and leave the rest to chance (reviewer luck and selection)
+
+There may not be sufficient candidate proposals to qualify however, in that case the threshold is dropped by .1 and selection starts over.
+
+Medium hard work, reviewer impact much diminished since there is a random selection process that follows. 
 """)
 
     exp = cols[2].expander("Hybrid Algorithm")
     exp.markdown("""
 ## The comprimise:
  
-Proposals tend to either be OMG this should be funded with a long tail of less extraordnary efforts. Program managers, admission committees and other selection processes do feel that judgement has an important and predictively useful role which is the driving force behind the Top N algorithm. 
+Proposals tend to either be OMG this should be funded with a long tail of less extraordinary efforts. Program managers, admission committees and other selection processes do feel that judgement has an important and predictively useful role which is the driving force behind the Top N algorithm. 
 
 So the hybrid algorithm acknoledges the desire for discretion but changes that to _Top N/2_ where half the funding is done that way, the remainder is _Random N_. The ratio could be adjusted but trying to keep it simple.
+
+Applicants can focus on winning _Top N_ or _Random N_. Presumably the true stars of the field will reliably rise while the rest continue along with random funding.  
+
 """)
 
 if SS.show_explanation:
-    st.markdown("## Lets spend some money!")
-    (col1, col2) = st.columns([1,1])
+    exp_spend = st.expander("Let's spend some money!")
+    exp_spend.markdown("## Watching the algorithms at work")
+    (col1, col2) = exp_spend.columns([1,1])
     slider_col = col1
     reputation_col = col2
 else:
@@ -678,22 +653,30 @@ def show_next_round():
     else:
         SS.current_round += 1
 
+def reset_current_round_and_run_sim_once(out):
+    SS.num_sims = 1
+    run_sim_as_configured()
+    SS.current_round = 1
+    if out is not None:
+        out.info("Ran Simulation")
+
 if SS.show_explanation:
     if SS.df is None:
         if col1.button("Run Algorithms"):
-            SS.num_sims = 1
-            run_sim_as_configured()
-            SS.current_round = 1
-    #       st.dataframe(SS.df)
+            reset_current_round_and_run_sim_once(None)
         else:
             st.stop()
     col1.button(f"Show next round",
                 on_click=show_next_round)
-        
+    if col1.button(f"Rerun Algorithms"):
+        reset_current_round_and_run_sim_once(col1)
     col2.radio(f"Algorithm to show: Round {SS.current_round}", 
-                options=['Top N', 'Random N', 'Hybrid'], 
+                options=SS.algo_names,
+                index=SS.algo_names.index(SS.algo_for_spend),
                 horizontal=True,
-                key="algo_cb")
+                on_change=generic_handler,
+                args=('algo_cb', 'algo_for_spend'),
+                key='algo_cb')
     sub_df = SS.df[(SS.df[ALGORITHM] == SS.algo_cb) &
                      (SS.df[ROUND_NUM] == SS.current_round)]
         
@@ -724,37 +707,31 @@ if SS.show_explanation:
                         SS.algo_cb == 'Hybrid')
 
     col1.pyplot(p9.ggplot.draw(plot))
+    col1.write("Add y axis controls here")
+    if col1.button("Set to defaults"):
+        reset()
+        reset_current_round_and_run_sim_once(col1)
 
-#exp = st.expander("Applying Top N algorithm for multiple rounds of funding")
-
-
-#if SS.show_explanation:
-#    (col1_empty, col2_, col3_empty) = st.columns(3)
-
-# col2.slider("Minimum threshold for funding",
-#             min_value=0.0,
-#             max_value=3.0,
-#             step=.25,
-#             value=SS.minimum_threshold,
-#             on_change=generic_handler,
-#             args=('threshold slider', 'minimum_threshold'),
-#             key='threshold slider')
 
 if SS.show_explanation:
-    exp = st.expander("Show one round of funding")
-    (col1, col2) = exp.columns(2)
-    col1.write("All Projects")
-    rand_n_df = SS.df[SS.df[ALGORITHM] == 'Random N']
-    display_df = rand_n_df.loc[:, SS.df.columns.\
-        isin([ALGORITHM, ID, SKILL, WRITEUP_DRAW, REVIEW_DRAW,
-            SCORE, FUNDS])]
-    col1.dataframe(display_df)
+    exp_spend.markdown("""
+## Cumulative effects of the algorithms
 
-hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
+The above graph/table and controls allow exploration of the qualities of the algorithms individually, one round at a time. 
+I suggest you 'Set to defaults' and iterate through one round at time for each algorithm. 
 
-if SS.show_explanation:
-    exp1 = st.expander("Details")
-    #exp1.markdown(top_n_doc)
+- With default settings, _Top N_ almost always allocates funds to a few projects. Since reputation increases with funding, there tends to be the same set of winners on each round. I suggest you run it a few times with defaults to get the feel for the configuration.  
+
+- _Random N_ tends to distribute funds much more evenly in comparision to the _Top N_. You can see this on Round 5 of funding while switching between the algorithms. All algorithms share the same skill, writeup and review values across organizations per round so the differences between algorithms shown is deterministic.
+
+- _Hybrid_ tends to have some strong winners from _Top N_ rounded out with a more even allocation from _Random N_ as expected. r 
+    
+""")
+
+
+
+#hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
+
 
 def apply_options():
     params = SS.interesting_params.split(', ')
@@ -789,7 +766,19 @@ options = ['Custom',
 'Notes: E) High miniumum score--algos same, reset(), minimum_threshold: 2.0, num_sims: 100']
 
 if SS.show_explanation:
-    st.stop()
+    exp_impact = st.expander("Impact of the algorithms")
+    exp_impact.markdown(f"""
+## Exploring the differences with algorithms and parameters
+
+The algorithms determine how the same amount of money is distributed across the same candidates. The larger consequences that follow get picked up in the discussion but here we want to introduce the tools to better understand the properties of the algorithm and corresponding paramterizations.
+
+Below is a histogram that counts the amount of funding a program got. If program {SS.names[1]} got $5 million then we record that fact.
+""")
+if SS.df is None:
+    run_sim_as_configured()
+plot_results(exp_impact, 1)
+
+st.stop()
 
 col3.selectbox("Interesting Parameterizations", options=options,
         on_change=apply_options,
