@@ -42,7 +42,7 @@ def reset():
     SS.hybrid_top_n_budget = SS.budget//2
     SS.funding_amount_in_millions = 1.0
     SS.num_funding_rounds = 5
-    SS.reputation_increase_per_funding_round = .75
+    SS.reputation_increase = .75
     SS.minimum_threshold = 1.0
     SS.num_sims = 1
     SS.algo_names = ['Top N', 'Random N', 'Hybrid']
@@ -64,7 +64,6 @@ def reset():
     SS.y_units_1 = 'percent'
     SS.y_units_2 = 'percent'
     SS.currently_being_scored = 0
-    SS.score_individually = True
     SS.sd_writeup_reflection_of_skill = .25
     SS.sd_reviewer_accuracy = .25
     SS.current_round = 1
@@ -73,15 +72,15 @@ def reset():
 session_config_values = ['Notes', 'sd_writeup_reflection_of_skill', 
 'sd_reviewer_accuracy', 'budget', 
 'funding_amount_in_millions', 'num_funding_rounds', 
-'reputation_increase_per_funding_round', 'minimum_threshold', 'num_sims',
+'reputation_increase', 'minimum_threshold', 'num_sims',
 'proj_skill_values', 'accum_df']
 
 def generic_handler(widget_name, variable):
     SS[variable] = SS[widget_name]
 
-if 'df' not in SS:
+if 'df' not in SS: #initialization when opened
     reset()
-    SS.sessions = []
+    SS.sessions = [] #persist across reset()
 
 def run_simulation(proj_data_2, 
                     num_funding_rounds, 
@@ -148,7 +147,7 @@ def run_simulation(proj_data_2,
 def run_n_simulations(num_sims, proj_skill_values, names, 
                       num_funding_rounds,
                       sd_writeup,
-                      sd_review, reputation_increase_per_funding_round, 
+                      sd_review, reputation_increase, 
                       budget, minimum_threshold, 
                       hybrid_top_n_budget, algo_names, num_projects):
     proj_data = util.init(proj_skill_values, names)
@@ -164,7 +163,7 @@ def run_n_simulations(num_sims, proj_skill_values, names,
                                 num_funding_rounds, 
                                 sd_writeup,
                                 sd_review,
-                                reputation_increase_per_funding_round, 
+                                reputation_increase, 
                                 budget,
                                 hybrid_top_n_budget,
                                 minimum_threshold)
@@ -204,7 +203,7 @@ def run_sim_as_configured():
                     SS.num_funding_rounds,
                     SS.sd_writeup_reflection_of_skill,
                     SS.sd_reviewer_accuracy,
-                    SS.reputation_increase_per_funding_round, 
+                    SS.reputation_increase, 
                     SS.budget, 
                     SS.minimum_threshold,
                     SS.hybrid_top_n_budget,
@@ -215,7 +214,6 @@ def run_n_wrapper():
     SS.num_sims = SS.simulation_radio_btn
     SS.Notes = ''
     run_sim_as_configured()
-
 
 def render3(df, column_to_show, show_top_n, show_random_n,
             show_hybrid):
@@ -280,48 +278,6 @@ def accum_gt_counts(num_funding_rounds, algo_names, sim_df):
                             (sim_df['funding bin'] == value), 
                             '>= count'] = gt_count
 
-st.title("How Algorithims Can Influence Research Diversity, Education and Publishing")
-st.markdown("A simulation fueled exploration")
-st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
-                 "\nSeptember, 2022"))
-
-st.checkbox("Show Narrative", value=SS.show_explanation, 
-            on_change=generic_handler,
-            args=('show_explanation_cb', 'show_explanation'),
-            key='show_explanation_cb')
-
-if SS.show_explanation:
-    exp = st.expander("Introduction", expanded=False)
-    exp.markdown("""
-## Welcome to the simulation
-
-Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort: The 2023 incoming class at Harvard, presentation at an academic conference and my focus--being among the awardees of a research grant. The simulation allows you to explore the cumulative effects of this process across 10 individuals over 5 cycles. 
-
-This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
-
-TL;DR The simulation covers three algorithms for 5 iterations across 10 people for research funding. The algorithms are: 
-
-1. A _Top N_ approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy.
-2. A _Random N_ approach that awards N slots randomly to candidates that pass a minumum score threshold.
-3. A _Hybrid_ approach that blends the two. 
-
-
-## Scoring candidates
-
-I'll use research funding as the use-case for the simulation with the following properties:
-
-- We have 10 researchers applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. Similar rationals can be made for the other use-cases of admissions or conference papers. 
-- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. 
-
-## Playing God
-
-You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time, but skills have to be assigned first. There are three options plus just setting scores as your omnipotence decrees:
-
-1. Bell Curve: Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0).
-2. God's Gift: One genius, A, in a collection of mediocrity, D's.
-3. A Mother's Love: All researchers have the same mother who raised them equally skilled but mother is a realist and knows they are pretty average (C's).
-""")
-
 def reset_current_simulation(out):
     out.info("Resetting current run, previous runs are preserved")
     SS.df = None
@@ -339,45 +295,6 @@ def apply_skills_rb():
         skills = [2.0] * 10
     for i, skill in enumerate(skills):
         SS.proj_skill_values[i] = skill
-    
-exp = st.expander("Set skills for projects")
-exp.radio("Suggested Skill Templates--modifiable", 
-    options=["Bell Curve", "God's Gift is Amongst Us", "A Mother's Love"],
-    index=2,
-    on_change=apply_skills_rb,
-    key="skills_rb",
-    horizontal=True)
-
-cols = exp.columns(SS.num_projects)
-for i in range(SS.num_projects):
-    cols[i].radio(f"{SS.names[i]}",
-                    SS.skills, 
-                    index=SS.skills.index(SS.proj_skill_values[i]),
-                    key=f"skill{i}",
-                    horizontal=False)
-if exp.button("Apply changes, resets current run"):
-    for i in range(10):
-        SS.proj_skill_values[i] = SS[f"skill{i}"]
-    reset_current_simulation(exp)
-
-#top_n_df = pd.DataFrame(top_n)
-if SS.show_explanation:
-    exp = st.expander("Fickle Human Simulation", expanded=False)
-    exp.markdown("""
-While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0 on a [Cartesian plot](https://en.wikipedia.org/wiki/Cartesian_coordinate_system):
-
-- Horizontal distance from the bull's eye is how accurately the proposal refelects the actual skill of the researcher.
-
-- Vertical distance from the bull's eye is the reviewer's accuracy reviewing said proposal. 
-
-You get to control where 68 percent of the darts will land, e.g., where one (1) [standard deviation](https://en.wikipedia.org/wiki/Standard_deviation) of random draws, aka dart throws, will land. Why the controls? 
-
-- If you think the writeup/proposal is always a perfect expression of the author's skill the set the standard deviation to 0.0. If you think writeups vary a lot in reflecting underlying skill then pick how much--there are only three remaining options: 0.25, 0.5, 0.75 and 1.0.  
-- Likewise, if you think reviewers have perfect recognition of assessing the skill in a writeup, then go with 0.0. If not, then how accurate are they? 
-
-With just 10 throws the results will not be perfectly scattered but an approximate 68\% area of the actual throws will be drawn when there are enough data points.
-
-Below are controls and a button to throw darts one at a time. You will see the draw and the math to compute the score which is just skill + writeup draw + revew draw + reputation (0.00 for now) = score. Review draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0. As often seen with humans, the reason is a complete fabrication.""")
 
 def plot_draws(author_draws, reviewer_draws, proj_names):
     x_dim = "Writeup's Reflection of Author Skill"
@@ -408,32 +325,9 @@ def plot_draws(author_draws, reviewer_draws, proj_names):
     )
     return(plot)
 
-(col1, col2, col3) = st.columns(3)
-
-if SS.show_explanation:
-    (col1, col2_wide) = exp.columns([1,2])
-
 def std_dev_handler(widget_name, variable, out):
     generic_handler(widget_name, variable)
     reset_current_simulation(out)
-
-col1.slider(f"Standard deviation writeup: {'68% of project writeup fall within specified +/- range in conveying skill' if SS.show_explanation else ''} ",   
-            min_value=0.0, max_value=1.0, step=0.25,
-            on_change=std_dev_handler,
-            args=('sd_writeup_slider', 
-                  'sd_writeup_reflection_of_skill',
-                  col1), 
-            value=SS.sd_writeup_reflection_of_skill,
-            key='sd_writeup_slider')
-
-col1.slider(f"Standard deviation reviewer: {'68% of reviewer evaluations within specified +/- range in grade points' if SS.show_explanation else ''}",
-            min_value=0.0, max_value=1.0, step=0.25,
-            on_change=std_dev_handler,
-            args=('sd_reviewer_slider',
-                   'sd_reviewer_accuracy',
-                   col1),
-            value=SS.sd_reviewer_accuracy,
-            key='sd_reviewer_slider')
 
 def add_score():
     reasons_positive_score = ['Strong morning coffee',
@@ -485,43 +379,6 @@ def render_scoring_df(df, out):
                             SCORE],
                     formatter='{:.2f}'))
 
-if SS.show_explanation:
-    if SS.score_individually:
-        if 'proj_data' not in SS:
-            SS.proj_data = util.init(SS.proj_skill_values, SS.names)
-        df = pd.DataFrame(SS.proj_data)
-        df = df[df[WRITEUP_DRAW].notnull()]
-        if len(df) < SS.num_projects:
-            col1.button(f"Draw writeup and review variation for {SS.names[SS.currently_being_scored]}'s project",
-                on_click=add_score,
-                key=f"draw_button")
-        if len(df) > 0:
-            try:
-                plot = plot_draws(list(df[WRITEUP_DRAW]), 
-                              list(df[REVIEW_DRAW]),
-                              list(df[ID]))
-                col2_wide.pyplot(p9.ggplot.draw(plot))
-            except p9.exceptions.PlotnineWarning as e:
-                st.info(e)
-            col1.write(f"Reason for reviewer draw: {df[REASON].iloc[-1][0]}")
-            render_scoring_df(df, col2_wide)
-    if len(df) < SS.num_projects:
-            exp.info(f"{SS.num_projects - len(df)} projects left to draw")
-            
-if SS.show_explanation: 
-    exp_rep = st.expander("Reputation")
-    exp_rep.markdown(f"""
-## Funding begets funding
-
-Reputation increments at {SS.reputation_increase_per_funding_round} for all the algorithms per award. This value can be changed below. Reputation is the mechanism that reflects the impact of having resources from previous funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or having a previously published conference paper on getting another conference paper accepted.
-
-All awards are \$1 million and the budget is exhausted each round. The budget can be raised to up to \$10 million but in even incremnts to allow for even split of the _Hybrid_ algorithm.
-""")
-
-if 'df' not in SS:
-    SS.df = None
-    SS.accum_df = None
-
 def plot_details(out):
     options = [FUNDS, WRITEUP_DRAW, REVIEW_DRAW,  
                 REPUTATION, SCORE, SKILL]
@@ -548,6 +405,14 @@ def plot_details(out):
                 args=('select_y_dim', 'y_dimension'),
                 key='select_y_dim')
 
+def generate_result_plot(accum_df, y_units, fill):
+    return (p9.ggplot(accum_df, p9.aes(x='funding bin',   
+                                y=y_units,       
+                                fill=fill))
+            + p9.geom_col(position='dodge')
+    )
+
+
 def plot_results(col, i):
     y_units_key_i = f'y_units_{i}'
     y_run_id_select_box_i = f'run_id_selectbox_{i}'
@@ -560,11 +425,13 @@ def plot_results(col, i):
         run_id = -1
     accum_df = SS.sessions[run_id]['accum_df']
     #st.dataframe(SS.accum_df)
-    plot = (p9.ggplot(accum_df, p9.aes(x='funding bin',   
-                                          y=SS[y_units_key_i],       
-                                          fill='algo')) 
-            + p9.geom_col(position='dodge')
-    )
+    plot = generate_result_plot(accum_df, SS[y_units_key_i],
+                                'algo')
+    #plot = (p9.ggplot(accum_df, p9.aes(x='funding bin',   
+    #                            y=SS[y_units_key_i],       
+    #                            fill=ALGORITHM)) 
+    #        + p9.geom_col(position='dodge')
+    #)
     if SS[y_units_key_i] == 'percent':
         plot = plot + p9.scale_y_continuous(labels=percent_format())
     col.pyplot(p9.ggplot.draw(plot))
@@ -580,8 +447,239 @@ def plot_results(col, i):
                     args=(y_run_id_select_box_i, sel_run_i),
                     key=y_run_id_select_box_i)
 
+def show_next_round():
+    if SS.current_round == SS.num_funding_rounds:
+        SS.current_round = 1
+    else:
+        SS.current_round += 1
+
+def reset_current_round_and_run_sim_once(out):
+    SS.num_sims = 1
+    run_sim_as_configured()
+    SS.current_round = 1
+    if out is not None:
+        out.info("Ran Simulation")
+
+def render_round_iterator(col1, col2):
+    col1.button(f"Show next round",
+            on_click=show_next_round)
+    col2.radio(f"Round {SS.current_round}", 
+                options=SS.algo_names,
+                index=SS.algo_names.index(SS.algo_for_spend),
+                horizontal=True,
+                on_change=generic_handler,
+                args=('algo_cb', 'algo_for_spend'),
+                key='algo_cb')
+    sub_df = SS.df[(SS.df[ALGORITHM] == SS.algo_cb) &
+                    (SS.df[ROUND_NUM] == SS.current_round)]
+        
+    sub_df = sub_df.loc[:, 
+                                sub_df.columns.isin([
+                                    ID, REPUTATION, 
+                                    SKILL,
+                                    WRITEUP_DRAW, 
+                                    REVIEW_DRAW,
+                                    WON,
+                                    SCORE, FUNDS])]
+        
+    col2.dataframe(sub_df\
+        .style.format(subset=[WRITEUP_DRAW, 
+                            REVIEW_DRAW,
+                            REPUTATION,
+                            SKILL, 
+                            SCORE], formatter='{:.2f}')\
+        .format(subset=[FUNDS], 
+                        formatter='${:.0f} M'))
+
+def apply_options():
+    params = SS.interesting_params.split(', ')
+    notes = ''
+    for param_value in params:
+        if param_value == 'reset()':
+            reset()
+            continue
+        split = param_value.split(': ')
+        if len(split) == 2:
+            param = split[0]
+            if param not in SS:
+                st.info(f"No such parameter {param}")
+                continue;
+            value= split[1]
+            st.info(value)
+            if re.match(r'^\d+\.\d+$', value):
+                value = float(value)
+            elif re.match(r'^\d+$', value):
+                value = int(value)
+            if param == 'Notes':
+                notes = value
+            SS[param] = value
+    SS.Notes = notes
+    run_sim_as_configured()
+
+def notes_handler():
+    SS.Notes = SS.notes_input
+    SS.sessions[-1]['Notes'] = SS.notes_input
+
+def render_session():
+    SS.accum_df = SS.sessions[SS.graph_session_select]['accum_df']
+
+def set_skills_exp():
+    exp = st.expander("Set skills for projects")
+    exp.radio("Suggested Skill Templates--modifiable", 
+    options=["Bell Curve", "God's Gift is Amongst Us", "A Mother's Love"],
+    index=2,
+    on_change=apply_skills_rb,
+    key="skills_rb",
+    horizontal=True)
+
+    cols = exp.columns(SS.num_projects)
+    for i in range(SS.num_projects):
+        cols[i].radio(f"{SS.names[i]}",
+                    SS.skills, 
+                    index=SS.skills.index(SS.proj_skill_values[i]),
+                    key=f"skill{i}",
+                    horizontal=False)
+    if exp.button("Apply changes, resets current run"):
+        for i in range(10):
+            SS.proj_skill_values[i] = SS[f"skill{i}"]
+        reset_current_simulation(exp)
+
+def writeup_sd_slider(col, label):
+    col.slider(label,
+        min_value=0.0, max_value=1.0, step=0.25,
+        on_change=std_dev_handler,
+        args=('sd_writeup_slider', 
+                'sd_writeup_reflection_of_skill',
+                col1), 
+        value=SS.sd_writeup_reflection_of_skill,
+        key='sd_writeup_slider')
+
+def reviewer_sd_slider(col, label):
+    col.slider(label, min_value=0.0, max_value=1.0, step=0.25,
+            on_change=std_dev_handler,
+            args=('sd_reviewer_slider',
+                   'sd_reviewer_accuracy',
+                   col1),
+            value=SS.sd_reviewer_accuracy,
+            key='sd_reviewer_slider')
+
+def render_iterative_draws(col1, col2):
+    if 'proj_data' not in SS:
+        SS.proj_data = util.init(SS.proj_skill_values, SS.names)
+    df = pd.DataFrame(SS.proj_data)
+    df = df[df[WRITEUP_DRAW].notnull()]
+    if len(df) < SS.num_projects:
+        col1.button(f"Draw writeup and review variation for {SS.names[SS.currently_being_scored]}'s project",
+            on_click=add_score,
+            key=f"draw_button")
+    if len(df) > 0:
+        try:
+            plot = plot_draws(list(df[WRITEUP_DRAW]), 
+                            list(df[REVIEW_DRAW]),
+                            list(df[ID]))
+            col2_wide.pyplot(p9.ggplot.draw(plot))
+        except p9.exceptions.PlotnineWarning as e:
+            st.info(e)
+        col1.write(f"Reason for reviewer draw: {df[REASON].iloc[-1][0]}")
+        render_scoring_df(df, col2)
+    if len(df) < SS.num_projects:
+        exp.info(f"{SS.num_projects - len(df)} projects left to draw")
+
+def budget_slider(col, label): #col2 for non-narr
+    col.slider(label, 
+            min_value=2, max_value=10, step=2, value=SS.budget, 
+            on_change=generic_handler,
+            args=('budget slider', 'budget'),
+            key='budget slider')
+
+def reputation_slider(col, label):
+    col.slider(label,
+                min_value=0.0, 
+                max_value=2.0, 
+                step=.25,
+                value=SS.reputation_increase,
+                on_change=generic_handler,
+                args=('reputation slider', 
+                      'reputation_increase'),
+                key='reputation slider')
+#--------------Direct Rendering Below Here---------
+
+st.title("How Algorithims Can Influence Research Diversity, Education and Publishing")
+st.markdown("A simulation fueled exploration")
+st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
+                 "\nSeptember, 2022"))
+
+st.checkbox("Show Narrative", value=SS.show_explanation, 
+            on_change=generic_handler,
+            args=('show_explanation_cb', 'show_explanation'),
+            key='show_explanation_cb')
 
 if SS.show_explanation:
+    exp = st.expander("Introduction", expanded=False)
+    exp.markdown("""
+## Welcome to the simulation
+
+Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort: The 2023 incoming class at Harvard, presentation at an academic conference and my focus--being among the awardees of a research grant. The simulation allows you to explore the cumulative effects of this process across 10 individuals over 5 cycles. 
+
+This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
+
+TL;DR The simulation covers three algorithms for 5 iterations across 10 people for research funding. The algorithms are: 
+
+1. A _Top N_ approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy.
+2. A _Random N_ approach that awards N slots randomly to candidates that pass a minumum score threshold.
+3. A _Hybrid_ approach that blends the two. 
+
+## Scoring candidates
+
+I'll use research funding as the use-case for the simulation with the following properties:
+
+- We have 10 researchers applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. Similar rationals can be made for the other use-cases of admissions or conference papers. 
+- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. 
+
+## Playing God
+
+You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time, but skills have to be assigned first. There are three options plus just setting scores as your omnipotence decrees:
+
+1. Bell Curve: Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0).
+2. God's Gift: One genius, A, in a collection of mediocrity, D's.
+3. A Mother's Love: All researchers have the same mother who raised them equally skilled but mother is a realist and knows they are pretty average (C's).
+""")
+    set_skills_exp()
+
+    exp = st.expander("Fickle Human Simulation", expanded=False)
+    exp.markdown("""
+While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0 on a [Cartesian plot](https://en.wikipedia.org/wiki/Cartesian_coordinate_system):
+
+- Horizontal distance from the bull's eye is how accurately the proposal refelects the actual skill of the researcher.
+
+- Vertical distance from the bull's eye is the reviewer's accuracy reviewing said proposal. 
+
+You get to control where 68 percent of the darts will land, e.g., where one (1) [standard deviation](https://en.wikipedia.org/wiki/Standard_deviation) of random draws, aka dart throws, will land. Why the controls? 
+
+- If you think the writeup/proposal is always a perfect expression of the author's skill the set the standard deviation to 0.0. If you think writeups vary a lot in reflecting underlying skill then pick how much--there are only three remaining options: 0.25, 0.5, 0.75 and 1.0.  
+- Likewise, if you think reviewers have perfect recognition of assessing the skill in a writeup, then go with 0.0. If not, then how accurate are they? 
+
+With just 10 throws the results will not be perfectly scattered but an approximate 68\% area of the actual throws will be drawn when there are enough data points.
+
+Below are controls and a button to throw darts one at a time. You will see the draw and the math to compute the score which is just skill + writeup draw + revew draw + reputation (0.00 for now) = score. Review draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0. As often seen with humans, the reason is a complete fabrication.""")
+
+    (col1, col2_wide) = exp.columns([1,2])
+    writeup_sd_slider(col1, 
+    "Standard deviation writeup: 68% of project writeup fall within specified +/- range in conveying skill")
+    
+    reviewer_sd_slider(col1,
+    "Standard deviation reviewer: '68% of reviewer evaluations within specified +/- range in grade points")
+    render_iterative_draws(col1, col2_wide)
+  
+    exp_rep = st.expander("Reputation")
+    exp_rep.markdown(f"""
+## Funding begets funding
+
+Reputation increments at {SS.reputation_increase} for all the algorithms per award. This value can be changed below. Reputation is the mechanism that reflects the impact of having resources from previous funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or having a previously published conference paper on getting another conference paper accepted.
+
+All awards are \$1 million and the budget is exhausted each round. The budget can be raised to up to \$10 million but in even incremnts to allow for even split of the _Hybrid_ algorithm.
+""")
+
     cols = st.columns(3)
     exp = cols[0].expander("Top N Algorithm")
     exp.markdown(f"""
@@ -621,99 +719,36 @@ Applicants can focus on winning _Top N_ or _Random N_. Presumably the true stars
 
 """)
 
-if SS.show_explanation:
     exp_spend = st.expander("Let's spend some money!")
     exp_spend.markdown("## Watching the algorithms at work")
     (col1, col2) = exp_spend.columns([1,1])
-    slider_col = col1
-    reputation_col = col2
-else:
-    slider_col = col2
-    reputation_col = col3
-slider_col.slider((f"Budget: {'In millions per funding cycle--each award is $1 million' if SS.show_explanation else ''}"), 
-            min_value=2, max_value=10, step=2, value=SS.budget, 
-            on_change=generic_handler,
-            args=('budget slider', 'budget'),
-            key='budget slider')
+    budget_slider(col1, 
+    "Budget: 'In millions per funding cycle--each award is $1 million")
 
-reputation_col.slider(f"Reputation increase: {'How much increase in reputation per funding award which is added to project score.' if SS.show_explanation else ''}", 
-                min_value=0.0, 
-                max_value=2.0, 
-                step=.25,
-                value=SS.reputation_increase_per_funding_round,
-                on_change=generic_handler,
-                args=('reputation slider', 
-                      'reputation_increase_per_funding_round'),
-                key='reputation slider')
+    reputation_slider(col2,
+    "Reputation increase: 'How much increase in reputation per funding award which is added to project score.")
 
-
-def show_next_round():
-    if SS.current_round == SS.num_funding_rounds:
-        SS.current_round = 1
-    else:
-        SS.current_round += 1
-
-def reset_current_round_and_run_sim_once(out):
-    SS.num_sims = 1
-    run_sim_as_configured()
-    SS.current_round = 1
-    if out is not None:
-        out.info("Ran Simulation")
-
-if SS.show_explanation:
+    if col1.button("(Re)run Algorithms"):
+        reset_current_round_and_run_sim_once(None)
     if SS.df is None:
-        if col1.button("Run Algorithms"):
-            reset_current_round_and_run_sim_once(None)
-        else:
-            st.stop()
-    col1.button(f"Show next round",
-                on_click=show_next_round)
-    if col1.button(f"Rerun Algorithms"):
-        reset_current_round_and_run_sim_once(col1)
-    col2.radio(f"Algorithm to show: Round {SS.current_round}", 
-                options=SS.algo_names,
-                index=SS.algo_names.index(SS.algo_for_spend),
-                horizontal=True,
-                on_change=generic_handler,
-                args=('algo_cb', 'algo_for_spend'),
-                key='algo_cb')
-    sub_df = SS.df[(SS.df[ALGORITHM] == SS.algo_cb) &
-                     (SS.df[ROUND_NUM] == SS.current_round)]
-        
-    sub_df = sub_df.loc[:, 
-                                sub_df.columns.isin([
-                                    ID, REPUTATION, 
-                                    SKILL,
-                                    WRITEUP_DRAW, 
-                                    REVIEW_DRAW,
-                                    WON,
-                                    SCORE, FUNDS])]
-        
-    col2.dataframe(sub_df\
-        .style.format(subset=[WRITEUP_DRAW, 
-                              REVIEW_DRAW,
-                              REPUTATION,
-                              SKILL, 
-                              SCORE], formatter='{:.2f}')\
-        .format(subset=[FUNDS], 
-                        formatter='${:.0f} M'))
+        st.stop()
 
-    col1.write(SS.algo_cb)
-    plot = render3(SS.df[(SS.df[ALGORITHM] == SS.algo_cb) &
-                        (SS.df[ROUND_NUM] <= SS.current_round)],
-                        FUNDS, 
-                        SS.algo_cb == 'Top N', 
-                        SS.algo_cb == 'Random N', 
-                        SS.algo_cb == 'Hybrid')
+    df = SS.df[(SS.df[ALGORITHM] == SS.algo_for_spend) &
+                (SS.df[ROUND_NUM] <= SS.current_round)]
+
+    plot = render3(df, FUNDS, 
+                        SS.algo_for_spend == 'Top N', 
+                        SS.algo_for_spend == 'Random N', 
+                        SS.algo_for_spend == 'Hybrid')
 
     col1.pyplot(p9.ggplot.draw(plot))
-    col1.write("Add y axis controls here")
+    result_plot = generate_result_plot(SS.accum_df, 'funding bin', 'algo')
+    col1.pyplot(p9.ggplot.draw(result_plot))
     if col1.button("Set to defaults"):
         reset()
         reset_current_round_and_run_sim_once(col1)
+    render_round_iterator(col1, col2)
 
-
-if SS.show_explanation:
     exp_spend.markdown("""
 ## Cumulative effects of the algorithms
 
@@ -728,39 +763,9 @@ I suggest you 'Set to defaults' and iterate through one round at time for each a
     
 """)
 
-
-
-#hybrid_random_n_budget = SS.budget - SS.hybrid_top_n_budget
-
-
-def apply_options():
-    params = SS.interesting_params.split(', ')
-    notes = ''
-    for param_value in params:
-        if param_value == 'reset()':
-            reset()
-            continue
-        split = param_value.split(': ')
-        if len(split) == 2:
-            param = split[0]
-            if param not in SS:
-                st.info(f"No such parameter {param}")
-                continue;
-            value= split[1]
-            st.info(value)
-            if re.match(r'^\d+\.\d+$', value):
-                value = float(value)
-            elif re.match(r'^\d+$', value):
-                value = int(value)
-            if param == 'Notes':
-                notes = value
-            SS[param] = value
-    SS.Notes = notes
-    run_sim_as_configured()
-
 options = ['Custom', 
 'Notes: A) Reset to defaults, reset()',
-'Notes: B) No reputation increase--algos roughly same, reset(), reputation_increase_per_funding_round: 0.0, num_sims: 100',
+'Notes: B) No reputation increase--algos roughly same, reset(), reputation_increase: 0.0, num_sims: 100',
 'Notes: C) Sufficient funding for all programs--all algos the same, reset(), budget: 10',
 'Notes: D) Really poor reviewers--algos roughly same!, reset(), standard_deviation: 1.0, num_sims: 100',
 'Notes: E) High miniumum score--algos same, reset(), minimum_threshold: 2.0, num_sims: 100']
@@ -774,11 +779,13 @@ The algorithms determine how the same amount of money is distributed across the 
 
 Below is a histogram that counts the amount of funding a program got. If program {SS.names[1]} got $5 million then we record that fact.
 """)
-if SS.df is None:
-    run_sim_as_configured()
-plot_results(exp_impact, 1)
+    (col1, col2,  col3) = exp_impact.columns(3)
 
-st.stop()
+    if SS.df is None:
+        run_sim_as_configured()
+    plot_results(exp_impact, 1)
+
+
 
 col3.selectbox("Interesting Parameterizations", options=options,
         on_change=apply_options,
@@ -796,8 +803,6 @@ col3.radio("Run N simulations", options=options,
 col1.button("(Re)run as configured", on_click=run_n_wrapper)
 #if SS.num_sims > 1:
 #    col1.info("Only last simulation results graphed since the number of simulations is > 1")
-if SS.df is None:
-    st.stop()
 
 num_plots = col2.selectbox("Number of plots", options=[1,2])
 if show_detail_graph:
@@ -813,16 +818,13 @@ else:
     for i in range(num_plots):
         plot_results(cols[i], i + 1)
 
-def notes_handler():
-    SS.Notes = SS.notes_input
-    SS.sessions[-1]['Notes'] = SS.notes_input
+
 
 st.text_input("Notes:", value=SS.Notes, 
                 on_change=notes_handler,
                 key='notes_input')
 
-def render_session():
-    SS.accum_df = SS.sessions[SS.graph_session_select]['accum_df']
+
 
 st.selectbox("Graph run", options=range(len(SS.sessions)),
             on_change=render_session,
