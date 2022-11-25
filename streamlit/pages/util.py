@@ -89,46 +89,7 @@ def distribute_awards(winners, funds, reputation):
         winner[FUNDS] += funds
         winner[WON] = True
 
-# def run3(top_n, rand_n, hybrid, num_funding_rounds, budget,
-#          reputation_increase_from_funding, funding_threshold):
-#     rounds_funding = []
-#     for funding_round in range(num_funding_rounds + 1):
-#         for proj_round in top_n + rand_n + hybrid:
-#             result = copy.deepcopy(proj_round)
-#             result['round'] = funding_round
-#             rounds_funding.append(result)
-#         if funding_round > num_funding_rounds:
-#             break
-#         add_score
-#     #top_n
-#         top_n_candidates = random.sample(top_n_candidates,len(top_n_candidates))
-#         sorted_candidates = sorted(top_n, 
-#                                 key=lambda s:['score'], 
-#                                 reverse=True)    
-#         for winner in sorted_candidates[0:budget]:
-#             winner['reputation'] +=  reputation_increase_from_funding
-#             winner['total funds'] += 1
-#             #winner['cumulative benefit'] = compute_benefit(winner)
-#     #random_n
-#         winners = select_random_n(budget, rand_n, funding_threshold)
-#         for winner in winners:
-#             winner['reputation'] += reputation_increase_from_funding
-#             winner['total funds'] += 1
-#     #hybrid
-#         sorted_candidates = sorted(hybrid, 
-#                                 key=lambda s:['score'], 
-#                                 reverse=True)
-#         top_n_slots = budget // 2
-#         top_n_winners = sorted_candidates[0:top_n_slots]
-#         random_candidates = [candidate for candidate in hybrid if 
-#                                 candidate not in top_n_winners]
-#         random_n_winners = select_random_n(budget - top_n_slots,
-#                                             random_candidates,
-#                                             funding_threshold)
-#         for winner in top_n_winners + random_n_winners:
-#             winner['reputation'] += reputation_increase_from_funding
-#             winner['total funds'] += 1
-#     # return rounds_funding
+
 
 def render3_util(df, column_to_show, show_top_n, show_random_n, 
             show_hybrid):
