@@ -619,11 +619,17 @@ if SS.show_explanation:
     exp.markdown("""
 ## Welcome to the simulation
 
-Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort: The 2023 incoming class at Harvard, presentation at an academic conference and my focus--being among the awardees of a research grant. The simulation allows you to explore the cumulative effects of this process across 10 individuals over 5 cycles. 
+Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort, for example: 
 
-This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
+- The 2023 incoming class at Harvard
+- Presentation at an academic conference
+- Being among the awardees of a research grant. 
 
-TL;DR The simulation covers three algorithms for 5 iterations across 10 people for research funding. The algorithms are: 
+This simulation focuses on cumulative effects of the last example, research grant funding, with three award algorithms across 10 individuals over 5 funding cycles. Academic admissions and research publications can be thought of in the context of the simulations parameters as well--although perhaps with different consequences. See the discussion section.
+
+foot note: This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
+
+The algorithms are: 
 
 1. A _Top N_ approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy.
 2. A _Random N_ approach that awards N slots randomly to candidates that pass a minumum score threshold.
@@ -631,10 +637,11 @@ TL;DR The simulation covers three algorithms for 5 iterations across 10 people f
 
 ## Scoring candidates
 
-I'll use research funding as the use-case for the simulation with the following properties:
+The simulation setup goes as follows:
 
-- We have 10 researchers applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. Similar rationals can be made for the other use-cases of admissions or conference papers. 
-- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. 
+- We have 10 researchers applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. In education, we could consider linked admissions events, high school, college, graduate school and one's first job. For publication, we could consider conference or journal publications. You can control the number of awards/admission slots/publication slots. 
+- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. The distribution of skills across the 10 particpants can be controlled. 
+- It is assumed that there are cumulative effects from success that increase the chance of subsequent success. This effect can be adjusted from zero upwards.
 
 ## Playing God
 
@@ -648,7 +655,7 @@ You'll be simulating wrecked careers as well as meteoric ascensions to greatness
 
     exp = st.expander("Fickle Human Simulation", expanded=False)
     exp.markdown("""
-While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing randomly from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0 on a [Cartesian plot](https://en.wikipedia.org/wiki/Cartesian_coordinate_system):
+While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0 on a [Cartesian plot](https://en.wikipedia.org/wiki/Cartesian_coordinate_system):
 
 - Horizontal distance from the bull's eye is how accurately the proposal refelects the actual skill of the researcher.
 
@@ -656,12 +663,14 @@ While you, God-like, know the skills assigned above, mere mortals write proposal
 
 You get to control where 68 percent of the darts will land, e.g., where one (1) [standard deviation](https://en.wikipedia.org/wiki/Standard_deviation) of random draws, aka dart throws, will land. Why the controls? 
 
-- If you think the writeup/proposal is always a perfect expression of the author's skill the set the standard deviation to 0.0. If you think writeups vary a lot in reflecting underlying skill then pick how much--there are only three remaining options: 0.25, 0.5, 0.75 and 1.0.  
+- If you think the writeup/proposal is always a perfect expression of the author's skill then set the standard deviation to 0.0. If you think writeups vary a lot in reflecting underlying skill then pick how much--there are only three remaining options: 0.25, 0.5, 0.75 and 1.0.  
 - Likewise, if you think reviewers have perfect recognition of assessing the skill in a writeup, then go with 0.0. If not, then how accurate are they? 
 
 With just 10 throws the results will not be perfectly scattered but an approximate 68\% area of the actual throws will be drawn when there are enough data points.
 
-Below are controls and a button to throw darts one at a time. You will see the draw and the math to compute the score which is just skill + writeup draw + revew draw + reputation (0.00 for now) = score. Review draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0. As often seen with humans, the reason is a complete fabrication.""")
+Below are controls and a button to throw darts one at a time. You will see the draw and the math to compute the score which is:
+`skill + writeup draw + revew draw + reputation (0.00 for now) = score` 
+Review draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0. As often seen with humans, the reason is a complete fabrication.""")
 
     (col1, col2_wide) = exp.columns([1,2])
     writeup_sd_slider(col1, 
@@ -673,9 +682,10 @@ Below are controls and a button to throw darts one at a time. You will see the d
   
     exp_rep = st.expander("Reputation")
     exp_rep.markdown(f"""
-## Funding begets funding
 
-Reputation increments at {SS.reputation_increase} for all the algorithms per award. This value can be changed below. Reputation is the mechanism that reflects the impact of having resources from previous funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or having a previously published conference paper on getting another conference paper accepted.
+## Success begets success
+
+Reputation currently increments by {SS.reputation_increase} for all the algorithms per award. This value can be changed below. Reputation is the mechanism that reflects the impact of having resources from earlier funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or for publication, having a previously published conference paper on getting another conference paper accepted.
 
 All awards are \$1 million and the budget is exhausted each round. The budget can be raised to up to \$10 million but in even incremnts to allow for even split of the _Hybrid_ algorithm.
 """)
@@ -700,7 +710,7 @@ If there are tied projects then pick randomly from them.
 
 The _Random N_ algorithm sets a minimum score for consideration in a lottery for the funds. There is no advantage to writing a proposal better than the threshold or having a greater reputation. 
 
-The incentive is to write an adequate proposal (work but less work than an 'excellent' proposal) to get above threshold and leave the rest to chance (reviewer luck and selection)
+The incentive is to write an adequate proposal (work but less work than an 'excellent' proposal) to get above threshold and leave the rest to chance (reviewer luck and selection luck)
 
 There may not be sufficient candidate proposals to qualify however, in that case the threshold is dropped by .1 and selection starts over.
 
@@ -713,7 +723,7 @@ Medium hard work, reviewer impact much diminished since there is a random select
  
 Proposals tend to either be OMG this should be funded with a long tail of less extraordinary efforts. Program managers, admission committees and other selection processes do feel that judgement has an important and predictively useful role which is the driving force behind the Top N algorithm. 
 
-So the hybrid algorithm acknoledges the desire for discretion but changes that to _Top N/2_ where half the funding is done that way, the remainder is _Random N_. The ratio could be adjusted but trying to keep it simple.
+So the hybrid algorithm acknoledges the desire for discretion but changes that to _Top N/2_ where half the funding is done that way, the remainder is _Random N_. The ratio could be adjusted but I am trying to keep it simple.
 
 Applicants can focus on winning _Top N_ or _Random N_. Presumably the true stars of the field will reliably rise while the rest continue along with random funding.  
 
@@ -723,10 +733,10 @@ Applicants can focus on winning _Top N_ or _Random N_. Presumably the true stars
     exp_spend.markdown("## Watching the algorithms at work")
     (col1, col2) = exp_spend.columns([1,1])
     budget_slider(col1, 
-    "Budget: 'In millions per funding cycle--each award is $1 million")
+    "Budget: In millions per funding cycle--each award is $1 million")
 
     reputation_slider(col2,
-    "Reputation increase: 'How much increase in reputation per funding award which is added to project score.")
+    "Reputation increase: How much increase in reputation per funding award which is added to project score.")
 
     if col1.button("(Re)run Algorithms"):
         reset_current_round_and_run_sim_once(None)
@@ -742,7 +752,7 @@ Applicants can focus on winning _Top N_ or _Random N_. Presumably the true stars
                         SS.algo_for_spend == 'Hybrid')
 
     col1.pyplot(p9.ggplot.draw(plot))
-    result_plot = generate_result_plot(SS.accum_df, 'funding bin', 'algo')
+    result_plot = generate_result_plot(df, 'funding bin', 'algo')
     col1.pyplot(p9.ggplot.draw(result_plot))
     if col1.button("Set to defaults"):
         reset()
@@ -839,6 +849,66 @@ rightmost_cols = \
     [col for col in cols if col not in leftmost_cols]
 reordered_cols = leftmost_cols + rightmost_cols
 st.dataframe(sessions_df[reordered_cols])
+
+discussion = """
+## Discussion
+
+THe DOE paper that prompted this work was focused on open source scientific software. I chose to discuss the funding selection model and oddly enough the Stan project got its start from a DOE grant that needed a project in the back channels of Columbia University--quite a random process actuall. I had be executive director of the Stan project (Bayesian model fitting) and had been through a few rounds of proposal writing to NASA, NSF, Chan-Zuckerberg Initiative and others. 
+
+In the context of funding open source projects, the _Top N_ approach is actually destrucitive from my perspective. 
+
+- Proposal writing takes a lot of work and from my particpation in NumFocus proposal writing jams (lots of projects, NumPy, SciPy, MathPlotLib and the like) apply for a call and talk about it on Slack). These proposals take at least a person month of effort and a lot of work goes into making them good with an around 20% chance of success. This is a huge distraction from key people on these projects for funding at around $100,000 to $500,000 over three years. This pays for things like continuous integration, professional programmers for some of the booring but necessary work and confernecs/get togethers. 
+
+- It would be a much better allocation of resources to reduce the proposal writing load to a thresholded evaluation model. Have the proposal be demonstrating things like:
+    + Userbase: Have N users active on forums
+    + Significance: X dependencies from other libraries
+    + Livelyness: Pull request aging over time
+    + Developer Base: Q developers submititng a pull request in the last X days
+    + Documentation/Tutorials: Demonstraated trainings/docs etc..
+    + Research citations over time.
+Then the rest of the proposal woiuld be how the funds would be used and who is in charge. Maybe a 2-3 pager? 
+
+- Since there often are insufficient funds to fund all proposals, delect randomly for qualifying proposals, _Random N_. 
+
+The runaway funding model really makes no sense for open source scientific sofware in my opinion. All the projects would benefit from funding and the first million goes a lot farther than the 5th million. 
+
+I ackowledge the reality of largely volunteer selection committees who feel like some proposals are much stronger than others, so the hybrid model makes sense. 
+
+## Academic papers/conferenc presentations
+
+Academic conferences and journals are intensly competitive domains where the algorithms are less straight-forwardly evaluated. The reputation score is what accumulates and publication runs off of reputation. Journals have page counts, conferences have speaking slots which are the "budget". The number of cycles reflects the accumulation of reputation over time. The value of that reputation translates into promotion, ability to attract funding and students all of which increase reputation.
+
+The impact of _Top N_ allocation is that rockstars get baked into the system and franky I think it kills diversity of thought. True rockstars are going to be recognized in any case if they really stand out but the rest of the field needs to exist too with less extraordinary talents. Turning non-rockstar talents into rockstars because of the the publication selection model seems nuts if it kills off the other non-rockstar talents. Fields need a diversity of ability. 
+
+## Education
+
+Getting into a good high-school helps get into a good college and so on, but are the cumulative effects a problem? Harvard is only going to graduate so may students a year so seems like the ones that get past the 5% acceptance rate are fine--what percentage of those that apply could function perfecty well in that environment? 50%?
+
+While I think it applies to all the scenerious, addmissions hits hard on the insane levels of effort required to craft the life profile of an 18 year old to be accepted that starts years prior to the application. I believe the hybrid model is in effect somewhat since legacy applicants (alumni children) are presumably thresholded at some level and the rest are picked based on a total order in a space that includes whether the orchstra needs an oboe player. I am guessing that Harvard's product, bright-eyed-and-bushy-tailed members of society, would be improved if the entire incoming class were held to the legacy threshold and _Random N_ selection. 
+
+This brings us to level 1 bias, which is that given a task to pick the top 20% from a list of people based on a criteria, those 20% will probably be biased by some quality that the evaluator is sensitive to. The easiest fix for that is to instead threshold at a significanly higher level and pick randomly from there--reduces the oppotunity for bias. Level 2 bias is to consider the impact of the threshold which has its own issues but I'd conjecture it is easier to spot. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+The simulation has been focused on research funding but I also mentioned academic admissions and research publications. 
+
+### Academic admissions
+
+
+
+With
+
+"""
 
 g = """
 
