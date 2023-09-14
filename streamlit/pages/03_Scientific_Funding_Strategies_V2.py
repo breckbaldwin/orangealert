@@ -607,7 +607,7 @@ def reputation_slider(col, label):
 st.title("How Algorithims Can Influence Research Diversity, Education and Publishing")
 st.markdown("A simulation fueled exploration")
 st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
-                 "\nSeptember, 2022"))
+                 "\nSeptember, 2023"))
 
 st.checkbox("Show Narrative", value=SS.show_explanation, 
             on_change=generic_handler,
@@ -625,14 +625,14 @@ Society allocates scarce resources in all sorts of ways--a common one relies on 
 - Presentation at an academic conference
 - Being among the awardees of a research grant. 
 
-This simulation focuses on cumulative effects of the last example, research grant funding, with three award algorithms across 10 individuals over 5 funding cycles. Academic admissions and research publications can be thought of in the context of the simulations parameters as well--although perhaps with different consequences. See the discussion section.
+This simulation uses the last exampmle, research grant funding*. It compares three different award algorithms across a population of 10 individuals over 5 funding cycles. The first two examples can be thought of similarly--although perhaps with different consequences. See the discussion section.
 
-foot note: This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
+(*) This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
 
 The algorithms are: 
 
 1. A _Top N_ approach which selects the highest scoring candidates with N funding slots, e.g., an American meritocracy.
-2. A _Random N_ approach that awards N slots randomly to candidates that pass a minumum score threshold.
+2. A _Random N_ approach that awards N slots randomly to candidates that pass a minumum score threshold. 
 3. A _Hybrid_ approach that blends the two. 
 
 ## Scoring candidates
@@ -648,7 +648,7 @@ The simulation setup goes as follows:
 You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time, but skills have to be assigned first. There are three options plus just setting scores as your omnipotence decrees:
 
 1. Bell Curve: Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0).
-2. God's Gift: One genius, A, in a collection of mediocrity, D's.
+2. A chosen one amongst the schmoes: One genius, A, in a collection of mediocrity, D's.
 3. A Mother's Love: All researchers have the same mother who raised them equally skilled but mother is a realist and knows they are pretty average (C's).
 """)
     set_skills_exp()
@@ -687,7 +687,7 @@ Review draws have a 'reason' for why the review was higher or lower than a perfe
 
 Reputation currently increments by {SS.reputation_increase} for all the algorithms per award. This value can be changed below. Reputation is the mechanism that reflects the impact of having resources from earlier funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or for publication, having a previously published conference paper on getting another conference paper accepted.
 
-All awards are \$1 million and the budget is exhausted each round. The budget can be raised to up to \$10 million but in even incremnts to allow for even split of the _Hybrid_ algorithm.
+All awards are \$1 million and the budget is exhausted each round. The budget can be raised to up to \$10 million but in even increments to allow for even split of the _Hybrid_ algorithm.
 """)
 
     cols = st.columns(3)
