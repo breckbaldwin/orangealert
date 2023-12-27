@@ -435,17 +435,17 @@ def plot_results(col, i):
     if SS[y_units_key_i] == 'percent':
         plot = plot + p9.scale_y_continuous(labels=percent_format())
     col.pyplot(p9.ggplot.draw(plot))
-    col.radio("Y units", units,
-               index=units.index(SS[y_units_key_i]),
-               on_change=generic_handler,
-               args=(y_radio_i, y_units_key_i),
-               key=y_radio_i)
-    col.selectbox("Run to show",
-                    runs,
-                    index=runs.index(SS[sel_run_i]),
-                    on_change=generic_handler,
-                    args=(y_run_id_select_box_i, sel_run_i),
-                    key=y_run_id_select_box_i)
+    # col.radio("Y units", units,
+    #            index=units.index(SS[y_units_key_i]),
+    #            on_change=generic_handler,
+    #            args=(y_radio_i, y_units_key_i),
+    #            key=y_radio_i)
+    # col.selectbox("Run to show",
+    #                 runs,
+    #                 index=runs.index(SS[sel_run_i]),
+    #                 on_change=generic_handler,
+    #                 args=(y_run_id_select_box_i, sel_run_i),
+    #                 key=y_run_id_select_box_i)
 
 def show_next_round():
     if SS.current_round == SS.num_funding_rounds:
@@ -609,14 +609,14 @@ st.markdown("A simulation fueled exploration")
 st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
                  "\nSeptember, 2023"))
 
-st.checkbox("Show Narrative", value=SS.show_explanation, 
-            on_change=generic_handler,
-            args=('show_explanation_cb', 'show_explanation'),
-            key='show_explanation_cb')
+#st.checkbox("Show Narrative", value=SS.show_explanation, 
+#            on_change=generic_handler,
+#            args=('show_explanation_cb', 'show_explanation'),
+#            key='show_explanation_cb')
 
-if SS.show_explanation:
-    exp = st.expander("Introduction", expanded=False)
-    exp.markdown("""
+
+exp = st.expander("Introduction", expanded=False)
+exp.markdown("""
 ## Welcome to the simulation
 
 Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort, for example: 
@@ -639,60 +639,26 @@ The algorithms are:
 
 The simulation setup goes as follows:
 
-- We have 10 researchers applying for funding for 5 funding cycles--many government programs have 5 year cycles with funds awarded each year. In education, we could consider linked admissions events, high school, college, graduate school and one's first job. For publication, we could consider conference or journal publications. You can control the number of awards/admission slots/publication slots. 
-- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. The distribution of skills across the 10 particpants can be controlled. 
-- It is assumed that there are cumulative effects from success that increase the chance of subsequent success. This effect can be adjusted from zero upwards.
+- We have 10 researchers applying for funding for 5 sequential funding opportunties with the same number of funding slots. In education, the example the sequence is high school, college, graduate school and one's first job. For publication, sequential conference or journal publications. 
+- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. Skill does not change over time. The default setting of skills is a bell curve of Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0). 
+- The benefits of winning a round impacts a reputation score that accumulates over time. For now we fix the reputation bump to .5 per successful round of funding. 
+             
+### The Hook
+             
+These simulations are only fun and informative if there is some aspect of the sitiation that unexepected and this case is no different. I'd say the obvious interpreation of the simulation setup is that Top N rewards the more skilled and Random N only fails to reward below threshold performers with a chance that a top performer is also un-funded. The unexpected part comes when the individuals come into success via luck that turns into reputational increases sufficient to positively influence subsequent rounds of funding. What scenerios support this outcome in a Top N selection?
 
-## Playing God
-
-You'll be simulating wrecked careers as well as meteoric ascensions to greatness in no time, but skills have to be assigned first. There are three options plus just setting scores as your omnipotence decrees:
-
-1. Bell Curve: Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0).
-2. A chosen one amongst the schmoes: One genius, A, in a collection of mediocrity, D's.
-3. A Mother's Love: All researchers have the same mother who raised them equally skilled but mother is a realist and knows they are pretty average (C's).
-""")
-    set_skills_exp()
-
-    exp = st.expander("Fickle Human Simulation", expanded=False)
-    exp.markdown("""
-While you, God-like, know the skills assigned above, mere mortals write proposals above or below their ability and reviewers even less reliably assess the skill reflected in the written proposal. We simulate this by drawing from a Gaussian/normal random distribution--think throwing darts with the bull's eye at 0,0 on a [Cartesian plot](https://en.wikipedia.org/wiki/Cartesian_coordinate_system):
-
-- Horizontal distance from the bull's eye is how accurately the proposal refelects the actual skill of the researcher.
-
-- Vertical distance from the bull's eye is the reviewer's accuracy reviewing said proposal. 
-
-You get to control where 68 percent of the darts will land, e.g., where one (1) [standard deviation](https://en.wikipedia.org/wiki/Standard_deviation) of random draws, aka dart throws, will land. Why the controls? 
-
-- If you think the writeup/proposal is always a perfect expression of the author's skill then set the standard deviation to 0.0. If you think writeups vary a lot in reflecting underlying skill then pick how much--there are only three remaining options: 0.25, 0.5, 0.75 and 1.0.  
-- Likewise, if you think reviewers have perfect recognition of assessing the skill in a writeup, then go with 0.0. If not, then how accurate are they? 
-
-With just 10 throws the results will not be perfectly scattered but an approximate 68\% area of the actual throws will be drawn when there are enough data points.
-
-Below are controls and a button to throw darts one at a time. You will see the draw and the math to compute the score which is:
-`skill + writeup draw + revew draw + reputation (0.00 for now) = score` 
-Review draws have a 'reason' for why the review was higher or lower than a perfectly accurate assessment at 0. As often seen with humans, the reason is a complete fabrication.""")
-
-    (col1, col2_wide) = exp.columns([1,2])
-    writeup_sd_slider(col1, 
-    "Standard deviation writeup: 68% of project writeup fall within specified +/- range in conveying skill")
-    
-    reviewer_sd_slider(col1,
-    "Standard deviation reviewer: '68% of reviewer evaluations within specified +/- range in grade points")
-    render_iterative_draws(col1, col2_wide)
-  
-    exp_rep = st.expander("Reputation")
-    exp_rep.markdown(f"""
-
-## Success begets success
-
-Reputation currently increments by {SS.reputation_increase} for all the algorithms per award. This value can be changed below. Reputation is the mechanism that reflects the impact of having resources from earlier funding. For school admissions it would be the impact that getting into a good high school has on getting into a good college, or for publication, having a previously published conference paper on getting another conference paper accepted.
-
-All awards are \$1 million and the budget is exhausted each round. The budget can be raised to up to \$10 million but in even increments to allow for even split of the _Hybrid_ algorithm.
+- Noisy evaluation and/or noisy articulation of skill. 
+- Sufficiently high benefit from a successful round of funding that subsequent rounds of funding are much more likely.
+             
+If we add a zero-sum quality to process which enforces a finite amount of recognition or reputation units across the population then we get a yard-sale dynamic where on person gets all the credit in the limit. 
 """)
 
-    cols = st.columns(3)
-    exp = cols[0].expander("Top N Algorithm")
-    exp.markdown(f"""
+(col1, col2_wide) = exp.columns([1,2])
+
+
+cols = st.columns(3)
+exp = cols[0].expander("Top N Algorithm")
+exp.markdown(f"""
 ## Algorithmic meritocracy:
 
 The _Top N_ algorithm will take the available budget of \${SS.budget} million, and parcel out $1 million at a time starting at the top scoring project until the budget is spent. 
@@ -704,8 +670,8 @@ Hard work and reviewers have to 'like the cut of your jib'.
 If there are tied projects then pick randomly from them.
 """)
 
-    exp = cols[1].expander("Random N algorithm")
-    exp.markdown("""
+exp = cols[1].expander("Random N algorithm")
+exp.markdown("""
 ## Work hard AND get lucky:
 
 The _Random N_ algorithm sets a minimum score for consideration in a lottery for the funds. There is no advantage to writing a proposal better than the threshold or having a greater reputation. 
@@ -717,8 +683,8 @@ There may not be sufficient candidate proposals to qualify however, in that case
 Medium hard work, reviewer impact much diminished since there is a random selection process that follows. 
 """)
 
-    exp = cols[2].expander("Hybrid Algorithm")
-    exp.markdown("""
+exp = cols[2].expander("Hybrid Algorithm")
+exp.markdown("""
 ## The comprimise:
  
 Proposals tend to either be OMG this should be funded with a long tail of less extraordinary efforts. Program managers, admission committees and other selection processes do feel that judgement has an important and predictively useful role which is the driving force behind the Top N algorithm. 
@@ -729,39 +695,39 @@ Applicants can focus on winning _Top N_ or _Random N_. Presumably the true stars
 
 """)
 
-    exp_spend = st.expander("Let's spend some money!")
-    exp_spend.markdown("## Watching the algorithms at work")
-    (col1, col2) = exp_spend.columns([1,1])
-    budget_slider(col1, 
-    "Budget: In millions per funding cycle--each award is $1 million")
+exp_spend = st.expander("Let's spend some money!")
+exp_spend.markdown("## Watching the algorithms at work")
+(col1, col2) = exp_spend.columns([1,1])
+budget_slider(col1, 
+"Budget: In millions per funding cycle--each award is $1 million")
 
-    reputation_slider(col2,
-    "Reputation increase: How much increase in reputation per funding award which is added to project score.")
+reputation_slider(col2,
+"Reputation increase: How much increase in reputation per funding award which is added to project score.")
 
-    if col1.button("(Re)run Algorithms"):
-        reset_current_round_and_run_sim_once(None)
-    if SS.df is None:
-        st.stop()
+if col1.button("(Re)run Algorithms"):
+    reset_current_round_and_run_sim_once(None)
+if SS.df is None:
+    st.stop()
 
-    df = SS.df[(SS.df[ALGORITHM] == SS.algo_for_spend) &
-                (SS.df[ROUND_NUM] <= SS.current_round)]
+df = SS.df[(SS.df[ALGORITHM] == SS.algo_for_spend) &
+            (SS.df[ROUND_NUM] <= SS.current_round)]
 
-    plot = render3(df, FUNDS, 
-                        SS.algo_for_spend == 'Top N', 
-                        SS.algo_for_spend == 'Random N', 
-                        SS.algo_for_spend == 'Hybrid')
+plot = render3(df, FUNDS, 
+                    SS.algo_for_spend == 'Top N', 
+                    SS.algo_for_spend == 'Random N', 
+                    SS.algo_for_spend == 'Hybrid')
 
-    col1.pyplot(p9.ggplot.draw(plot))
-    #breakpoint()
-    result_plot = generate_result_plot(df, 'funding bin', 'algo')
-    #col1.pyplot(p9.ggplot.draw(result_plot))
-    col1.write("Missing result plot")
-    if col1.button("Set to defaults"):
-        reset()
-        reset_current_round_and_run_sim_once(col1)
-    render_round_iterator(col1, col2)
+col1.pyplot(p9.ggplot.draw(plot))
+#breakpoint()
+result_plot = generate_result_plot(df, 'funding bin', 'algo')
+#col1.pyplot(p9.ggplot.draw(result_plot))
+col1.write("Missing result plot")
+if col1.button("Set to defaults"):
+    reset()
+    reset_current_round_and_run_sim_once(col1)
+render_round_iterator(col1, col2)
 
-    exp_spend.markdown("""
+exp_spend.markdown("""
 ## Cumulative effects of the algorithms
 
 The above graph/table and controls allow exploration of the qualities of the algorithms individually, one round at a time. 
