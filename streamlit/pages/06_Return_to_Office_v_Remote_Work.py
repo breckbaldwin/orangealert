@@ -13,3 +13,45 @@ Asserting RTO comes with very vauge justifications and little in the way of hard
 
 Lets pretend there is a rational case for RTO and simulate how things are different in the WFH environment. 
             """)
+
+# productivity
+# innovation
+# coordination
+# onboarding
+# slacking
+# control
+# civic duty to downtowns
+# 
+
+# innovation = execution * cross pollination * focus * resouces * effort
+
+UI.markdown("""
+I'll start with a really mathematically boring model, just a bunch of multiplicative factors but I'm hoping it helps structure my thinking. 
+            
+innovation = execution * cross pollination * focus * resouces * effort
+            
+Innovation was the reason management offered at my day job so lets start with that.
+            
+I'll stick with a three way distinction picking from "Office", "About the same", and "Home". 
+            
+We will take the office
+            """)
+
+office_same_home = ['Office', 'About the same', 'Home']
+office_same_home_values = [.5, 1, 1.5]
+
+def num_fr_ordered_cat_selectbox(text, ordered_options, numeric_values):
+    choice = UI.selectbox(text,
+             options=ordered_options)
+    return numeric_values[ordered_options.index(choice)]
+    
+work_harder_at = num_fr_ordered_cat_selectbox("People work harder at:", office_same_home, office_same_home_values)
+
+problem_solving_better_at = num_fr_ordered_cat_selectbox("Problem solving with others works best at:", office_same_home, office_same_home_values)
+
+
+y = work_harder_at + problem_solving_better_at
+
+UI.markdown(f"{y} = {work_harder_at} + {problem_solving_better_at}")
+
+

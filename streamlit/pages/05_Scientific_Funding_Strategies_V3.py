@@ -604,8 +604,8 @@ def reputation_slider(col, label):
                 key='reputation slider')
 #--------------Direct Rendering Below Here---------
 
-st.title("How Algorithims Can Influence Research Diversity, Education and Publishing")
-st.markdown("A simulation fueled exploration")
+st.title("Algorithms and the Success Ratchet")
+st.markdown("Simulating Meritocracy")
 st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
                  "\nSeptember, 2023"))
 
@@ -615,17 +615,31 @@ st.markdown(("**Breck Baldwin**, breckbaldwin@gmail.com" +
 #            key='show_explanation_cb')
 
 
-exp = st.expander("Introduction", expanded=False)
+exp = st.expander("The Power of Random", expanded=False)
 exp.markdown("""
-## Welcome to the simulation
+             
+Two Face was onto something, the Batman villan ...
 
-Society allocates scarce resources in all sorts of ways--a common one relies on convincing others that you deserve membership in an elete cohort, for example: 
+             
+If you are in a competitive job then your hardest won gig is generally the first one. It involves hard work, luck and timing. Then, chances are, the next gig goes better because you have a gig under your belt and people know about it. Many parts of life have this quality. 
+Research funding definately qualifies for this pattern and it has a big impact on the kinds of science that get done. 
+             
+That first grant makes a huge difference, you have results from the funded work, you have graduate students to do more work, and you get a reputation increase just from getting picked. 
 
-- The 2023 incoming class at Harvard
-- Presentation at an academic conference
-- Being among the awardees of a research grant. 
+Depending on how subsequent funding is doled out, that first grant could make all the difference for future funding. We are going to play around with two funding approaches--algorithms. Lets say we have 10 researchers in cancer research, 4 $1 million funding opportunities which means that the first round of funding will have 4 winners and 6 losers. What happens the next round of funding depends on the algorithm:
+    1. The National Institutes of Health (NIH) score proposals on a pretty fined grained scale and awards funds from the top scoring downwards until they run out of budget.
+    2. NIH could do something different. They could specify a "passing" score for proposals and if more researchers than money pass then pick randomly. 
 
-This simulation uses the last exampmle, research grant funding*. It compares three different award algorithms across a population of 10 individuals over 5 funding cycles. The first two examples can be thought of similarly--although perhaps with different consequences. See the discussion section.
+The two algorithms have obvious outcomes, if you get funded the first round you will get funded on subsequent rounds--this is the success ratchet. The second will be much more egalitarian in funding--you play the game long enough you will eventually get some funding, no one is going to run away with all the money. So which serves society the best? Which serves individual talent the best? 
+
+# Hide a Genius
+             
+So lets make it interesting, we have a genius among our 10 researchers and society would clearly benefit from the genius' cancer cure. What algorithm will maximize finding them and getting them some funding? 
+             
+             Lets jump right in: We will track 10 people applying for cancer research funding from National Institutes of Health (NIH)
+             
+
+This simulation uses the last example, research grant funding*. It compares three different award algorithms across a population of 10 individuals over 5 funding cycles. The first two examples can be thought of similarly--although perhaps with different consequences. See the discussion section.
 
 (*) This work more fully explores a screed I wrote for the Department of Energy's conference on funding scientific software, reference to the paper and accompanying simulation is at [Funding Strategies for Scientific Software](https://breckbaldwin.github.io/S3rd/presentations/DOE2021/FundingStrategiesForSciSoftware.html).
 
@@ -640,7 +654,7 @@ The algorithms are:
 The simulation setup goes as follows:
 
 - We have 10 researchers applying for funding for 5 sequential funding opportunties with the same number of funding slots. In education, the example the sequence is high school, college, graduate school and one's first job. For publication, sequential conference or journal publications. 
-- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. Skill does not change over time. The default setting of skills is a bell curve of Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0). 
+- The researchers have a 'skill' value between 0.0, an F, to 4.0, an A on US style grading scale that are their actual ability/smarts/training. Skill does not change over time. The default setting of skills is a bell curve of Mostly C's (2.0), some B's (3.0) and D's (1.0) and an outlier A (4.0) and F (0.0). [graphic here]
 - The benefits of winning a round impacts a reputation score that accumulates over time. For now we fix the reputation bump to .5 per successful round of funding. 
              
 ### The Hook
