@@ -38,19 +38,20 @@ We will take the office
             """)
 
 office_same_home = ['Office', 'About the same', 'Home']
-office_same_home_values = [.5, 1, 1.5]
+office_same_home_values = [1.5, 1, .5]
 
 def num_fr_ordered_cat_selectbox(text, ordered_options, numeric_values):
     choice = UI.selectbox(text,
              options=ordered_options)
     return numeric_values[ordered_options.index(choice)]
     
-work_harder_at = num_fr_ordered_cat_selectbox("People work harder at:", office_same_home, office_same_home_values)
+office_effort = num_fr_ordered_cat_selectbox("People work harder at:", office_same_home, office_same_home_values)
 
 problem_solving_better_at = num_fr_ordered_cat_selectbox("Problem solving with others works best at:", office_same_home, office_same_home_values)
 
+office = 
 
-y = work_harder_at + problem_solving_better_at
+y = baseline + office*office_effort + office*office_innovation
 
 UI.markdown(f"{y} = {work_harder_at} + {problem_solving_better_at}")
 
